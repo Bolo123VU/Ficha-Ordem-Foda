@@ -62,6 +62,11 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
   <body>
+    <!-- Status Indicator -->
+    <div id="status-indicator" style="position: fixed; top: 10px; right: 10px; z-index: 9999; padding: 8px 16px; border-radius: 8px; font-family: monospace; font-size: 14px; font-weight: bold; background: #dc2626; color: white; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+      ❌ CARREGANDO... / ERRO
+    </div>
+    
     <div id="root"></div>
 
     <script type="text/babel">
@@ -655,7 +660,40 @@
         );
       }
 
+      // Update status indicator when app loads successfully
+      function updateStatusIndicator() {
+        const statusEl = document.getElementById('status-indicator');
+        if (statusEl) {
+          statusEl.style.background = '#16a34a';
+          statusEl.innerHTML = '✅ APP RODANDO';
+          
+          // Hide the indicator after 3 seconds
+          setTimeout(() => {
+            statusEl.style.opacity = '0.7';
+            statusEl.style.fontSize = '12px';
+            statusEl.innerHTML = '✅ OK';
+          }, 3000);
+        }
+      }
+
       ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+      
+      // Call status update after React renders
+      setTimeout(updateStatusIndicator, 100);
+    </script>
+    
+    <!-- Fallback status check if React fails -->
+    <script>
+      setTimeout(() => {
+        const statusEl = document.getElementById('status-indicator');
+        const rootEl = document.getElementById('root');
+        
+        if (statusEl && (!rootEl || !rootEl.children.length)) {
+          statusEl.style.background = '#dc2626';
+          statusEl.innerHTML = '❌ ERRO: CDN BLOQUEADO';
+          console.error('App failed to load - likely CDN resources are blocked');
+        }
+      }, 2000);
     </script>
   </body>
 </html>
