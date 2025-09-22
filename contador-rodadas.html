@@ -145,7 +145,7 @@
       // Ficha components (unchanged behavior)
       function FichaPlayer({ data = {}, onChange = () => {}, onDelete = () => {}, color }) {
         const [showModal, setShowModal] = useState(false);
-        const d = { nome:'', nivel:0, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, pe:0, peMax:1, peTemp:0, estab:0, estabMax:1, estabTemp:0, fome:0, fomeMax:1, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:10, ...data };
+        const d = { nome:'', nivel:0, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, pe:0, peMax:1, peTemp:0, estab:0, estabMax:1, estabTemp:0, fome:0, fomeMax:1, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:10, dadoIniciativa:'', ...data };
         const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
         const handleMaximo = (fieldMax,val,atualField)=>{ const novoMax = Math.max(1, Number(val)||1); const upd = {...d, [fieldMax]:novoMax}; if (safeNum(d[atualField])>novoMax) upd[atualField]=novoMax; onChange(upd); };
         return (
@@ -236,7 +236,7 @@
 
       function FichaNPC({ data = {}, onChange = () => {}, onDelete = () => {}, color, label }) {
         const [showModal, setShowModal] = useState(false);
-        const d = { nome:'', tipo:'pessoa', vd:0, nivel:undefined, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, estab:0, estabMax:1, estabTemp:0, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:5, ...data };
+        const d = { nome:'', tipo:'pessoa', vd:0, nivel:undefined, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, estab:0, estabMax:1, estabTemp:0, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:5, dadoIniciativa:'', ...data };
         const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
 
         const handleMaximo = (fieldMax,val,atualField)=>{ const novoMax = Math.max(1, Number(val)||1); const upd = {...d, [fieldMax]:novoMax}; if (safeNum(d[atualField])>novoMax) upd[atualField]=novoMax; onChange(upd); };
@@ -615,22 +615,22 @@
         const [tab, setTab] = useState('Ficha');
         const [fichaSubTab, setFichaSubTab] = useState('Players');
 
-        const [players, setPlayers] = useState([{ id: 1, nome: 'Jogador 1', nivel: 1, nex: 0, idade: 25, expVida: 80, pv: 10, pvMax: 100, pvTemp: 0, pe: 5, peMax: 50, peTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, fome: 0, fomeMax: 10, desloc: 6, defesa: 10, bloqueio: 5, esquiva: 5, iniciativa: 10 }]);
+        const [players, setPlayers] = useState([{ id: 1, nome: 'Jogador 1', nivel: 1, nex: 0, idade: 25, expVida: 80, pv: 10, pvMax: 100, pvTemp: 0, pe: 5, peMax: 50, peTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, fome: 0, fomeMax: 10, desloc: 6, defesa: 10, bloqueio: 5, esquiva: 5, iniciativa: 10, dadoIniciativa: '' }]);
         const [npcs, setNpcs] = useState([]);
         const [inimigos, setInimigos] = useState([]);
 
         // file input ref for import
         const fileRef = useRef(null);
 
-        function addPlayer() { setPlayers(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `Jogador ${p.length+1}`, nivel: 1, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, pe: 5, peMax: 50, peTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, fome: 0, fomeMax: 10, desloc: 6, defesa: 10, bloqueio: 5, esquiva: 5, iniciativa: 10 }])); }
+        function addPlayer() { setPlayers(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `Jogador ${p.length+1}`, nivel: 1, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, pe: 5, peMax: 50, peTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, fome: 0, fomeMax: 10, desloc: 6, defesa: 10, bloqueio: 5, esquiva: 5, iniciativa: 10, dadoIniciativa: '' }])); }
         function updateFicha(idx, newData) { setPlayers(arr => arr.map((f,i) => i === idx ? { ...f, ...newData } : f)); }
         function deleteFicha(idx) { setPlayers(arr => arr.filter((_, i) => i !== idx)); }
 
-        function addNpc() { setNpcs(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `NPC ${p.length+1}`, tipo: 'pessoa', nivel: undefined, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, desloc: 6, defesa: 10, bloqueio: 0, esquiva: 0, iniciativa:5 }])); }
+        function addNpc() { setNpcs(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `NPC ${p.length+1}`, tipo: 'pessoa', nivel: undefined, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, desloc: 6, defesa: 10, bloqueio: 0, esquiva: 0, iniciativa:5, dadoIniciativa: '' }])); }
         function updateNpc(idx, newData) { setNpcs(arr => arr.map((f,i) => i === idx ? { ...f, ...newData } : f)); }
         function deleteNpc(idx) { setNpcs(arr => arr.filter((_, i) => i !== idx)); }
 
-        function addInimigo() { setInimigos(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `Inimigo ${p.length+1}`, tipo: 'pessoa', vd: 0, nivel: undefined, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, desloc: 6, defesa: 10, bloqueio: 0, esquiva: 0, iniciativa:8 }])); }
+        function addInimigo() { setInimigos(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `Inimigo ${p.length+1}`, tipo: 'pessoa', vd: 0, nivel: undefined, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, desloc: 6, defesa: 10, bloqueio: 0, esquiva: 0, iniciativa:8, dadoIniciativa: '' }])); }
         function updateInimigo(idx, newData) { setInimigos(arr => arr.map((f,i) => i === idx ? { ...f, ...newData } : f)); }
         function deleteInimigo(idx) { setInimigos(arr => arr.filter((_, i) => i !== idx)); }
 
