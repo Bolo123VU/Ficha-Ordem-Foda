@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Contador Rodadas App — Revisado (Stable)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { background: #202632; color: #fff; }
+      .card-bg { background: #323846; }
+      .card-inner { background: #42495a; border-radius: 16px; position: relative; }
+      .input-dark { background: #242834; color: #fff; border: none; outline: none; }
+      .input-dark:focus { outline: 2px solid #facc15; outline-offset: 0.5px; }
+      .input-temp { background: #23283a !important; color: #d3d3d3 !important; font-size: 0.95rem; width: 38px; border-radius: 6px; text-align: center; margin-left: 6px; border: none; }
+      .input-temp:focus { box-shadow: 0 0 0 2px #facc15; }
+      .ficha-header-color { width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; display: inline-block; vertical-align: middle; }
+      .badge-main { background: #facc15 !important; color: #222 !important; font-weight: bold; padding: 2px 10px; border-radius: 6px; }
+      .badge-estab { background: #60a5fa !important; color: #06283d !important; font-weight: bold; padding: 2px 8px; border-radius: 6px; }
+      .npc-label-btn { background: #23283a; color: #facc15; font-size: .80rem; font-weight: bold; border-radius: 5px; padding: 0px 8px; margin-bottom: 8px; display: inline-block; cursor: pointer; }
+      .npc-label-btn.selected { background: #facc15; color: #23283a; }
+      .npc-label-btn + .npc-label-btn { margin-left: 6px; }
+      .delete-btn { background: #ff2323; color: #fff; font-weight: bold; border-radius: 5px; padding: 0.16rem 0.6rem; font-size: 0.93rem; }
+      .delete-btn:hover { background: #ff5555; }
+      .defesa-lock { margin-left: 8px; font-size: 1.3rem; }
+      .modal-bg { position: fixed; top:0; left:0; width:100vw; height:100vh; background:#000a; z-index:50; display:flex; align-items:center; justify-content:center; }
+      .modal-box { background:#323846; border-radius:10px; padding:1.5rem 2rem; box-shadow:0 0 18px #0009; }
+      .modal-btn { font-weight:bold; border-radius:5px; padding: 0.2rem 1.3rem; margin:0 8px; }
+      .modal-btn.confirm { background:#facc15; color:#23283a; }
+      .modal-btn.cancel { background:#ff2323; color:#fff; }
+      ::-webkit-scrollbar { width: 8px; background: #23283a; }
+      ::-webkit-scrollbar-thumb { background: #323846; border-radius: 8px; }
+
+      /* Adicionados para UI de abas/botões (melhora visual) */
+      .tab-btn { background: transparent; color: #e6eef8; padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; }
+      .tab-btn.active { background: #facc15; color: #111827; }
+      .btn-yellow { background: #facc15; color: #111827; font-weight: 700; border: none; cursor: pointer; }
+      .tab-btn:focus, .btn-yellow:focus { outline: 3px solid rgba(250,204,21,0.18); }
+
+      /* Cena layout */
+      .scene-panel { background: #1f2937; padding: 1rem; border-radius: 0.75rem; }
+      .combatant-card { border-radius: 8px; padding: 0.85rem; background: rgba(255,255,255,0.03); margin-bottom: 0.75rem; display:flex; flex-direction:column; }
+      .combatant-top { display:flex; gap:0.5rem; align-items:center; }
+      .init-input { width:70px; }
+      .effect-pill { background:#2563eb; color:#fff; padding:4px 8px; border-radius:999px; display:inline-block; font-size:0.8rem; }
+      .scene-controls { display:flex; gap:0.5rem; }
+
+      /* Fichas layout inside Ficha tab */
+      .ficha-section { margin-bottom: 1.25rem; }
+      .ficha-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; }
+      .ficha-grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:1rem; }
+      .ficha-subtabs { display:flex; gap:0.5rem; margin-bottom:1rem; }
+      .ficha-subtab { padding:0.3rem 0.7rem; border-radius:8px; cursor:pointer; background:transparent; color:#e6eef8; }
+      .ficha-subtab.active { background:#facc15; color:#111827; }
+
+      /* Responsividade menor ajuste */
+      @media (max-width: 640px) {
+        .card-inner { padding: 1rem; }
+      }
+    </style>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+      const safeNum = v => Number(v) || 0;
+
+      // estabilidade mapping
+      function getEstabilidadeInfo(total) {
+        const t = safeNum(total);
+        if (t >= 6) return { label: 'Sã', desc: 'Você recebe +1 em testes de Resistência.' };
+        if (t === 5) return { label: 'Saudável', desc: 'Sua sanidade está ok.' };
+        if (t === 4) return { label: 'Afetado', desc: 'Você recebe -1 em Vontade.' };
+        if (t === 3) return { label: 'Perturbado', desc: 'Você recebe -1 em testes de Resistência.' };
+        if (t === 2) return { label: 'Traumatizado', desc: 'Você sofre um efeito de medo.' };
+        if (t === 1) return { label: 'Quebrado', desc: 'No seu turno role 1d6 — resultado 1 ou 2: você perde sua ação; sua iniciativa é reduzida em -5.' };
+        return { label: 'Enlouquecendo', desc: 'Você tem 3 rodadas para ser salvo.' };
+      }
+
+      function getDescricaoEstabilidade(total) {
+        const info = getEstabilidadeInfo(total);
+        return (<><strong>{info.label}</strong> ({safeNum(total)}): {info.desc}</>);
+      }
+
+      function getDescricaoEstabilidadeText(total) {
+        const info = getEstabilidadeInfo(total);
+        return `${info.label} (${safeNum(total)}): ${info.desc}`;
+      }
+
+      // dice roller utilities (kept simple)
+      function rollDiceComponent(text) {
+        const raw = String(text||'').trim();
+        if (!raw) return { raw, op: 'none', amount: 0, rolls: [], detail: '0' };
+        const lead = raw.match(/^([+-])/);
+        const op = lead ? (lead[1] === '+' ? 'add' : 'sub') : 'none';
+        const body = lead ? raw.slice(1).trim() : raw;
+        const m = body.match(/^([0-9]+)d([0-9]+)([+-][0-9]+)?$/i);
+        if (m) {
+          const n = Math.max(0, parseInt(m[1],10));
+          const faces = Math.max(1, parseInt(m[2],10));
+          const mod = m[3] ? parseInt(m[3],10) : 0;
+          const rolls = [];
+          let sum = 0;
+          for (let i=0;i<n;i++) { const r = Math.floor(Math.random()*faces)+1; rolls.push(r); sum += r; }
+          const amount = sum + mod;
+          const detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
+          return { raw, op, amount, rolls, detail };
+        }
+        const asNum = Number(body);
+        if (!Number.isNaN(asNum)) return { raw, op, amount: Math.floor(asNum), rolls: [], detail: `${Math.floor(asNum)}` };
+        return { raw, op: 'none', amount: 0, rolls: [], detail: '0' };
+      }
+
+      function rollMulti(expr) {
+        if (expr === null || expr === undefined) return { total:0, add:0, sub:0, details:[] };
+        const parts = String(expr).split(',').map(x=>x.trim()).filter(Boolean);
+        let total=0, add=0, sub=0; const details = [];
+        for (const p of parts) {
+          const comp = rollDiceComponent(p);
+          details.push({ raw: comp.raw, op: comp.op, amount: comp.amount, detail: comp.detail, rolls: comp.rolls });
+          if (comp.op === 'sub') { sub += comp.amount; total -= comp.amount; }
+          else if (comp.op === 'add') { add += comp.amount; total += comp.amount; }
+          else { total += comp.amount; }
+        }
+        return { total, add, sub, details };
+      }
+
+      function parseDurationValue(val) {
+        if (val === undefined || val === null || String(val).trim() === '') return 0;
+        const s = String(val).trim();
+        const num = Number(s);
+        if (!Number.isNaN(num)) return Math.floor(num);
+        try { const r = rollMulti(s); return Math.max(0, Math.floor(Math.abs(r.total))); } catch(e) { return 0; }
+      }
+
+      function ConfirmModal({ open, title, onConfirm, onCancel }) { if (!open) return null; return (
+        <div className="modal-bg"><div className="modal-box"><div className="mb-3 text-lg text-yellow-200 font-semibold">{title}</div>
+        <div className="flex justify-center mt-2"><button className="modal-btn confirm" onClick={onConfirm}>Sim</button>
+        <button className="modal-btn cancel" onClick={onCancel}>Cancelar</button></div></div></div>
+      ); }
+
+      // Ficha components (unchanged behavior)
+      function FichaPlayer({ data = {}, onChange = () => {}, onDelete = () => {}, color }) {
+        const [showModal, setShowModal] = useState(false);
+        const d = { nome:'', nivel:0, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, pe:0, peMax:1, peTemp:0, estab:0, estabMax:1, estabTemp:0, fome:0, fomeMax:1, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:10, ...data };
+        const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
+        const handleMaximo = (fieldMax,val,atualField)=>{ const novoMax = Math.max(1, Number(val)||1); const upd = {...d, [fieldMax]:novoMax}; if (safeNum(d[atualField])>novoMax) upd[atualField]=novoMax; onChange(upd); };
+        return (
+          <div className="card-inner p-4 relative"> <ConfirmModal open={showModal} title="Deseja realmente deletar esta ficha?" onConfirm={()=>{setShowModal(false); onDelete();}} onCancel={()=>setShowModal(false)} />
+            <div className="flex items-center mb-3"><span className="ficha-header-color" style={{background: color||'#F97316'}} />
+            <input className="input-dark px-2 py-1 rounded w-full text-base font-semibold" value={d.nome} onChange={e=>onChange({...d,nome:e.target.value})} />
+            <button className="delete-btn ml-2" type="button" onClick={()=>setShowModal(true)} title="Deletar">🗑</button></div>
+
+            <div className="grid grid-cols-2 gap-2 mb-2"><div>
+              <label className="text-xs text-gray-200 ml-1">Nível</label>
+              <input className="input-dark w-full p-1 rounded font-semibold" type="number" min={0} value={d.nivel} onChange={e=>onChange({...d,nivel:Number(e.target.value)})} />
+              <label className="text-xs text-gray-400 ml-1">Idade</label>
+              <input className="input-dark w-full p-1 rounded text-sm" type="number" min={0} value={d.idade} onChange={e=>onChange({...d,idade:Number(e.target.value)})} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-200 ml-1">Nex</label>
+              <input className="input-dark w-full p-1 rounded font-semibold" type="number" min={0} value={d.nex} onChange={e=>onChange({...d,nex:Number(e.target.value)})} />
+              <label className="text-xs text-gray-400 ml-1">Expectativa de Vida</label>
+              <input className="input-dark w-full p-1 rounded text-sm" type="number" min={0} value={d.expVida} onChange={e=>onChange({...d,expVida:Number(e.target.value)})} />
+            </div></div>
+
+            <div className="grid grid-cols-2 gap-2 mb-2"><div>
+              <label className="text-xs text-gray-200 ml-1">PV</label>
+              <div className="input-group">
+                <input className="input-dark w-12 p-1 rounded font-bold text-center" type="number" min={0} max={d.pvMax} value={d.pv} onChange={e=>handleAtual('pv',e.target.value,d.pvMax)} />
+                <input className="input-dark w-12 p-1 rounded text-center text-xs" type="number" min={1} value={d.pvMax} onChange={e=>handleMaximo('pvMax', e.target.value, 'pv')} />
+                <input className="input-temp" type="number" placeholder="+0" value={(d.pvTemp===0||d.pvTemp===undefined)?'':d.pvTemp} onChange={e=>onChange({...d,pvTemp:Number(e.target.value)||0})} />
+              </div>
+              <span className="text-xs text-gray-400 mt-1 block">{ safeNum(d.pv) + (safeNum(d.pvTemp)>0?safeNum(d.pvTemp):0) }</span>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-200 ml-1">PE</label>
+              <div className="input-group">
+                <input className="input-dark w-12 p-1 rounded font-bold text-center" type="number" min={0} max={d.peMax} value={d.pe} onChange={e=>handleAtual('pe',e.target.value,d.peMax)} />
+                <input className="input-dark w-12 p-1 rounded text-center text-xs" type="number" min={1} value={d.peMax} onChange={e=>handleMaximo('peMax', e.target.value, 'pe')} />
+                <input className="input-temp" type="number" placeholder="+0" value={(d.peTemp===0||d.peTemp===undefined)?'':d.peTemp} onChange={e=>onChange({...d,peTemp:Number(e.target.value)||0})} />
+              </div>
+              <span className="text-xs text-gray-400 mt-1 block">{ safeNum(d.pe) + (safeNum(d.peTemp)>0?safeNum(d.peTemp):0) }</span>
+            </div></div>
+
+            <div className="grid grid-cols-2 gap-2 mb-2"><div>
+              <label className="text-xs text-gray-200 ml-1">Estabilidade</label>
+              <div className="input-group">
+                <input className="input-dark w-12 p-1 rounded font-bold text-center" type="number" min={0} max={d.estabMax} value={d.estab} onChange={e=>handleAtual('estab', e.target.value, d.estabMax)} />
+                <input className="input-dark w-12 p-1 rounded text-center text-xs" type="number" min={1} value={d.estabMax} onChange={e=>handleMaximo('estabMax', e.target.value, 'estab')} />
+                <input className="input-temp" type="number" placeholder="+0" value={(d.estabTemp===0||d.estabTemp===undefined)?'':d.estabTemp} onChange={e=>onChange({...d,estabTemp:Number(e.target.value)||0})} />
+              </div>
+              <div className="text-xs text-gray-300 mt-1">{ getDescricaoEstabilidade(safeNum(d.estab)+safeNum(d.estabTemp)) }</div>
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-200 ml-1">Fome</label>
+              <div className="input-group">
+                <input className="input-dark w-12 p-1 rounded font-bold text-center" type="number" min={0} max={d.fomeMax} value={d.fome} onChange={e=>handleAtual('fome', e.target.value, d.fomeMax)} />
+                <input className="input-dark w-12 p-1 rounded text-center text-xs" type="number" min={1} value={d.fomeMax} onChange={e=>handleMaximo('fomeMax', e.target.value, 'fome')} />
+              </div>
+            </div></div>
+
+            <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Deslocamento</label>
+              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.desloc} onChange={e=>onChange({...d,desloc:Number(e.target.value)})} />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mb-2"><div>
+              <label className="text-xs text-gray-200 ml-1">Defesa</label>
+              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.defesa} onChange={e=>onChange({...d,defesa:Number(e.target.value)})} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-200 ml-1">Bloqueio</label>
+              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.bloqueio} onChange={e=>onChange({...d,bloqueio:Number(e.target.value)})} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-200 ml-1">Esquiva</label>
+              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.esquiva} onChange={e=>onChange({...d,esquiva:Number(e.target.value)})} />
+            </div></div>
+
+            <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Iniciativa</label>
+              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+            </div>
+
+            <button className="absolute bottom-3 right-3 p-1 rounded bg-gray-800 text-gray-200 border border-gray-600" title="Max travado" tabIndex={-1} type="button">🔒</button>
+          </div>
+        );
+      }
+
+      function FichaNPC({ data = {}, onChange = () => {}, onDelete = () => {}, color, label }) {
+        const [showModal, setShowModal] = useState(false);
+        const d = { nome:'', tipo:'pessoa', vd:0, nivel:undefined, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, estab:0, estabMax:1, estabTemp:0, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:5, ...data };
+        const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
+
+        const handleMaximo = (fieldMax,val,atualField)=>{ const novoMax = Math.max(1, Number(val)||1); const upd = {...d, [fieldMax]:novoMax}; if (safeNum(d[atualField])>novoMax) upd[atualField]=novoMax; onChange(upd); };
+        const setTipoNPC = novoTipo => { const novo = {...d, tipo: novoTipo}; if (novoTipo==='animal') { novo.idade=undefined; novo.expVida=undefined; novo.estab=undefined; novo.estabMax=undefined; novo.estabTemp=undefined; novo.nivel=undefined; novo.vd=novo.vd??0;} else { novo.nivel=undefined; novo.vd=novo.vd??0; if (novo.idade===undefined) novo.idade=1; if (novo.expVida===undefined) novo.expVida=1; if (novo.estab===undefined) novo.estab=0; if (novo.estabMax===undefined) novo.estabMax=10; if (novo.estabTemp===undefined) novo.estabTemp=0;} onChange(novo); };
+        return (
+          <div className="card-inner p-4 relative"> <ConfirmModal open={showModal} title="Deseja realmente deletar esta ficha?" onConfirm={()=>{setShowModal(false); onDelete();}} onCancel={()=>setShowModal(false)} />
+            <div className="flex items-center mb-3"><span className="ficha-header-color" style={{background: color||'#F97316'}} />
+            <input className="input-dark px-2 py-1 rounded w-full text-base font-semibold" value={d.nome} onChange={e=>onChange({...d,nome:e.target.value})} />
+            <button className="delete-btn ml-2" type="button" onClick={()=>setShowModal(true)} title="Deletar">🗑</button></div>
+            <div className="mb-2">
+              <span className={`npc-label-btn ${d.tipo==='pessoa'?'selected':''}`} onClick={()=>setTipoNPC('pessoa')}>Pessoa</span>
+              <span className={`npc-label-btn ${d.tipo==='animal'?'selected':''}`} onClick={()=>setTipoNPC('animal')}>Animal</span>
+              { label && <span className="ml-2 font-bold text-yellow-400">{label}</span> }
+            </div>
+
+            {/* ... campos (igual ao anterior) ... */}
+
+            <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Iniciativa</label>
+              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+            </div>
+
+          </div>
+        );
+      }
+
+      function Scene({ sourcePlayers = [], sourceNpcs = [], sourceInimigos = [], onPlayerChangePV = () => {}, onNpcChangePV = () => {}, onInimigoChangePV = () => {}, onUpdateInitiative = () => {} }) {
+        function normalizeEffect(e) {
+          const name = e.name || 'Efeito';
+          const dice = e.dice || e.expr || '1d6';
+          let durRaw;
+          if (typeof e.remaining === 'number') durRaw = e.remaining;
+          else if (typeof e.duration === 'number') durRaw = e.duration;
+          else durRaw = (e.duration === undefined ? 0 : e.duration);
+          const dur = (typeof durRaw === 'number') ? durRaw : parseDurationValue(durRaw);
+          const remaining = dur === 0 ? null : Math.max(1, Math.floor(dur));
+          return { name, dice, remaining };
+        }
+
+        function initialList() {
+          const list = [];
+          sourcePlayers.forEach((p,i)=> list.push({ id:`p-${p.id}`, origId: p.id, tipo:'player', nome: p.nome||`Player ${i+1}`, pv: safeNum(p.pv), pvTemp: safeNum(p.pvTemp), pe: safeNum(p.pe), estab: safeNum(p.estab), estabTemp: safeNum(p.estabTemp), iniciativa: (p.iniciativa!==undefined?safeNum(p.iniciativa):10), effects: p.effects? p.effects.map(normalizeEffect):[] }));
+          sourceNpcs.forEach((n,i)=> list.push({ id:`n-${n.id}`, origId: n.id, tipo:'npc', nome: n.nome||`NPC ${i+1}`, pv: safeNum(n.pv), pvTemp: safeNum(n.pvTemp), pe: undefined, estab: safeNum(n.estab), estabTemp: safeNum(n.estabTemp), iniciativa: (n.iniciativa!==undefined?safeNum(n.iniciativa):5), effects: n.effects? n.effects.map(normalizeEffect):[] }));
+          sourceInimigos.forEach((m,i)=> list.push({ id:`e-${m.id}`, origId: m.id, tipo:'inimigo', nome: m.nome||`Inimigo ${i+1}`, pv: safeNum(m.pv), pvTemp: safeNum(m.pvTemp), pe: undefined, estab: safeNum(m.estab), estabTemp: safeNum(m.estabTemp), iniciativa: (m.iniciativa!==undefined?safeNum(m.iniciativa):8), effects: m.effects? m.effects.map(normalizeEffect):[] }));
+          list.sort((a,b)=> safeNum(b.iniciativa) - safeNum(a.iniciativa));
+          return list;
+        }
+
+        const savedSceneState = (typeof window !== 'undefined' && window.__sceneState) ? window.__sceneState : null;
+        const [round, setRound] = useState(savedSceneState?.round ?? 1);
+        const [turnIndex, setTurnIndex] = useState(savedSceneState?.turnIndex ?? 0);
+        // initialize combatants from ficha so Cena sempre acompanha a Ficha
+        const [combatants, setCombatants] = useState(() => initialList());
+        const [log, setLog] = useState(savedSceneState?.log ?? []);
+        const [effectInputs, setEffectInputs] = useState(savedSceneState?.effectInputs ?? {});
+
+        // palette local (mesma do App)
+        const palette = ['#F97316','#60A5FA','#34D399','#F472B6','#A78BFA','#FCA5A5','#FACC15','#38BDF8','#FB923C','#84CC16','#F59E0B','#EF4444'];
+        function getColorForActor(origId, tempId) {
+          if (typeof origId === 'number' && !Number.isNaN(origId)) return palette[Math.abs(origId) % palette.length];
+          const idx = combatants.findIndex(c => c.id === tempId);
+          return palette[(idx >= 0 ? idx : 0) % palette.length];
+        }
+
+        // persist some scene state (round/turn/log/effects) but NOT iniciativa — iniciativa sempre vem da ficha
+        useEffect(() => { try { const toSave = { round, turnIndex, log, effectInputs }; window.__sceneState = toSave; } catch (e) { /* ignore */ } }, [round, turnIndex, log, effectInputs]);
+
+        // rebuild combatants whenever ficha muda so CENA follows FICHA (this ensures initiatives come from Ficha)
+        useEffect(()=>{
+          const rebuilt = initialList().map(c => ({ ...c }));
+          rebuilt.sort((a,b)=> safeNum(b.iniciativa) - safeNum(a.iniciativa));
+          const currentId = combatants[turnIndex]?.id;
+          const newIndex = rebuilt.findIndex(c=>c.id===currentId);
+          setCombatants(rebuilt);
+          setTurnIndex(newIndex>=0?newIndex:0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [sourcePlayers, sourceNpcs, sourceInimigos]);
+
+        function setTempEffectField(id, field, value) { setEffectInputs(prev=> ({ ...prev, [id]: { ...(prev[id]||{}), [field]: value } })); }
+
+        function addEffectTo(idx) {
+          const cb = combatants[idx]; if (!cb) return; const id = cb.id; const tmp = effectInputs[id] || {};
+          const parsed = (tmp.duration===undefined || tmp.duration==='')?0: parseDurationValue(tmp.duration);
+          const remaining = parsed===0? null: parsed; // null === infinito
+          const effect = { name: (tmp.name||'').trim()||'Efeito', dice: (tmp.dice||'').trim()||'1d6', remaining };
+          setCombatants(prev=> prev.map((c,i)=> i===idx ? {...c, effects: [...(c.effects||[]), effect]}: c));
+          setEffectInputs(prev=> ({ ...prev, [id]: {} }));
+          setLog(l=> ([{ kind: 'effect_added', actorId: cb.id, actorOrigId: cb.origId, actorName: cb.nome, effectName: effect.name, dice: effect.dice, duration: effect.remaining, time: new Date() }, ...l]));
+        }
+
+        function removeEffectFrom(idx, efIdx) { setCombatants(prev=> prev.map((c,i)=> i===idx ? { ...c, effects: (c.effects||[]).filter((_,j)=> j!==efIdx) } : c)); }
+
+        function applyDamageToCombatant(c, damage) {
+          let remTemp = safeNum(c.pvTemp || 0);
+          let basePv = safeNum(c.pv || 0);
+          let toAbsorb = Math.max(0, Math.floor(damage || 0));
+          if (toAbsorb <= 0) return { pv: basePv, pvTemp: remTemp };
+          const takeFromTemp = Math.min(remTemp, toAbsorb);
+          remTemp = remTemp - takeFromTemp;
+          toAbsorb -= takeFromTemp;
+          basePv = Math.max(0, basePv - toAbsorb);
+          return { pv: basePv, pvTemp: remTemp };
+        }
+
+        function applyStartEffects(index) {
+          setCombatants(prevCombatants=>{
+            const arr = prevCombatants.map(c=> ({ ...c, effects: c.effects? c.effects.map(e=>({...e})): [], pvTemp: safeNum(c.pvTemp || 0) }));
+            const c = arr[index]; if (!c || !c.effects || c.effects.length===0) return arr;
+
+            const logs = []; const pvChanges = [];
+
+            const newEffects = [];
+            for (const e of c.effects) {
+              const res = rollMulti(e.dice || e.expr || '1d6');
+
+              for (const d of res.details) {
+                logs.push({ kind: 'effect_result', actorId: c.id, actorOrigId: c.origId, actorName: c.nome, effectName: e.name, op: d.op, amount: d.amount, detail: d.detail || d.amount, raw: d.raw, time: new Date() });
+              }
+
+              if (res.sub>0) { const dmg = res.sub; const updated = applyDamageToCombatant(c, dmg); c.pv = updated.pv; c.pvTemp = updated.pvTemp; pvChanges.push({ id: c.id, origId: c.origId, tipo: c.tipo, pv: updated.pv, pvTemp: updated.pvTemp }); }
+              if (res.add>0) { c.pv = safeNum(c.pv) + res.add; pvChanges.push({ id: c.id, origId: c.origId, tipo: c.tipo, pv: c.pv, pvTemp: c.pvTemp }); }
+
+              if (e.remaining===null || e.remaining===undefined) { newEffects.push({ ...e, remaining: null }); }
+              else if (typeof e.remaining === 'number') {
+                const after = e.remaining - 1;
+                if (after >= 0) {
+                  newEffects.push({ ...e, remaining: after });
+                } else {
+                  logs.push({ kind: 'effect_expired', actorId: c.id, actorOrigId: c.origId, actorName: c.nome, effectName: e.name, time: new Date() });
+                }
+              } else {
+                newEffects.push({ ...e });
+              }
+            }
+
+            c.effects = newEffects;
+            arr[index] = c;
+
+            if (logs.length) setLog(prev => ([...logs, ...prev]));
+            if (pvChanges.length) {
+              setTimeout(() => {
+                for (const ch of pvChanges) {
+                  const origIdNum = ch.origId;
+                  const payload = { pv: ch.pv, pvTemp: ch.pvTemp };
+                  if (ch.tipo === 'player') onPlayerChangePV(origIdNum, payload);
+                  if (ch.tipo === 'npc') onNpcChangePV(origIdNum, payload);
+                  if (ch.tipo === 'inimigo') onInimigoChangePV(origIdNum, payload);
+                }
+              }, 0);
+            }
+
+            return arr;
+          });
+        }
+
+        function updateCombatant(idx, patch) {
+          setCombatants(prev => {
+            const newArr = prev.map((c,i) => i === idx ? { ...c, ...patch } : c);
+            // propagate iniciativa change back to fichas (App) if user edits it here
+            if (patch && Object.prototype.hasOwnProperty.call(patch, 'iniciativa')) {
+              try {
+                const target = newArr[idx];
+                if (target) onUpdateInitiative(target.origId, Number(patch.iniciativa), target.tipo);
+                newArr.sort((a,b) => safeNum(b.iniciativa) - safeNum(a.iniciativa));
+              } catch(e) {}
+            }
+            return newArr;
+          });
+        }
+
+        function nextTurn() {
+          setTurnIndex(prev => {
+            if (combatants.length === 0) return 0;
+            const next = (prev + 1) >= combatants.length ? 0 : (prev + 1);
+            if (next === 0) setRound(r => r + 1);
+            setTimeout(() => applyStartEffects(next), 0);
+            setLog(l => ([{ t: `Início do turno de ${ (combatants[next] && combatants[next].nome) || '—' } (Rodada ${ next === 0 ? round + 1 : round })`, time: new Date() }, ...l]));
+            return next;
+          });
+        }
+
+        function resetScene() {
+          setRound(1);
+          setTurnIndex(0);
+          setCombatants(initialList());
+          setLog([]);
+          try { if (typeof window !== 'undefined') window.__sceneState = null; } catch (e) {}
+        }
+
+        const filteredLogs = log.filter(l => {
+          if (!l) return false;
+          if (typeof l === 'string') return l.includes('Efeito');
+          if (typeof l === 'object' && l.kind) return String(l.kind).startsWith('effect');
+          return typeof l === 'object' && (l.effectName || (l.t && String(l.t).includes('Efeito')));
+        });
+
+        return (
+          <div className="scene-panel">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="text-sm text-gray-300">Rodada: <span className="font-bold text-yellow-400">{round}</span></div>
+                <div className="text-sm text-gray-300">Turno: <span className="font-bold text-yellow-400">{turnIndex + 1}</span> / <span>{combatants.length || 0}</span></div>
+              </div>
+              <div className="scene-controls">
+                <button className="tab-btn" onClick={nextTurn}>Próximo Turno</button>
+                <button className="tab-btn" onClick={resetScene}>Resetar</button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <div style={{ flex: 1 }}>
+                {combatants.length === 0 && <div className="text-gray-400">Nenhum combatente. Adicione players/NPCs/Inimigos na aba Ficha.</div>}
+                {combatants.map((c, i) => (
+                  <div key={c.id} className="combatant-card" style={{ border: i === turnIndex ? '2px solid #facc15' : '1px solid rgba(255,255,255,0.03)', background: i === turnIndex ? 'rgba(250,204,21,0.08)' : undefined }}>
+                    <div className="combatant-top">
+                      <input className="input-dark px-2 py-1 rounded w-full text-base font-semibold" value={c.nome} onChange={e => updateCombatant(i, { nome: e.target.value })} />
+                      {/* iniciativa: editable but changes propagate back to Ficha via onUpdateInitiative provided by App */}
+                      <input className="input-dark px-2 py-1 rounded font-semibold init-input text-center" type="number" value={c.iniciativa} onChange={e => { const val = Number(e.target.value)||0; updateCombatant(i, { iniciativa: val }); }} title="Edite iniciativa (sincroniza com a Ficha)" />
+                    </div>
+
+                    <div style={{ marginTop: 8 }}>
+                      {(c.effects && c.effects.length > 0) ? (
+                        c.effects.map((ef, idxEf) => (
+                          <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <span className="effect-pill">{ef.name} ({ef.dice})</span>
+                            <span style={{ fontSize: 12, color: '#cbd5e1' }}>{ef.remaining === null ? 'indefinido' : `duração: ${ef.remaining}`}</span>
+                            <button className="delete-btn" onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-gray-500">Sem efeitos</div>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: 8, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div className="text-xs text-gray-300">PV: </div>
+                      {(() => {
+                        const total = safeNum(c.pv) + Math.max(0, safeNum(c.pvTemp || 0));
+                        const pvTemp = Math.max(0, safeNum(c.pvTemp || 0));
+                        return (
+                          <input className="input-dark w-28 p-1 rounded font-bold text-center" type="text" value={`${total}${pvTemp? ` (${pvTemp})`: ''}`} readOnly title="Edite PV na aba Ficha" />
+                        );
+                      })()}
+
+                      {c.pe !== undefined && <><div className="text-xs text-gray-300 ml-2">PE:</div><span className="badge-main">{c.pe}</span></>}
+
+                      {(() => {
+                        const estabTotal = safeNum(c.estab) + Math.max(0, safeNum(c.estabTemp || 0));
+                        const info = getEstabilidadeInfo(estabTotal);
+                        return (
+                          <div style={{ marginLeft: 12 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div className="text-xs text-gray-300">Est:</div>
+                              <span className="badge-estab" title={getDescricaoEstabilidadeText(estabTotal)}>{estabTotal}</span>
+                            </div>
+                            <div className="text-xs text-gray-300 mt-1"><strong>{info.label}</strong> — {info.desc}</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input className="input-dark p-1 rounded text-sm" placeholder="Nome do efeito" value={(effectInputs[c.id] && effectInputs[c.id].name) || ''} onChange={e => setTempEffectField(c.id, 'name', e.target.value)} />
+                      <input className="input-dark p-1 rounded text-sm" placeholder="Dado (ex: 1d6 ou -1d6 ou +1d6, múltiplos separados por ,)" value={(effectInputs[c.id] && effectInputs[c.id].dice) || ''} onChange={e => setTempEffectField(c.id, 'dice', e.target.value)} />
+                      <input className="input-dark p-1 rounded text-sm" placeholder="Duração (0 indefinido)" value={(effectInputs[c.id] && effectInputs[c.id].duration) || ''} onChange={e => setTempEffectField(c.id, 'duration', e.target.value)} />
+                      <button className="btn-yellow" onClick={() => addEffectTo(i)}>Adicionar Efeito</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ width: 340 }}>
+                <div style={{ background: '#111827', padding: 12, borderRadius: 8 }}>
+                  <h3 className="text-lg font-semibold text-white">Log (efeitos)</h3>
+                  <div style={{ height: 420, overflow: 'auto', marginTop: 8, color: '#9ca3af' }}>
+                    {filteredLogs.length === 0 ? <div className="text-gray-500">Nenhum evento ainda.</div> : filteredLogs.map((l, idx) => (
+                      <div key={idx} style={{ padding: '6px 0', borderBottom: '1px dashed rgba(255,255,255,0.02)' }}>
+                        <div>
+                          { typeof l === 'string' ? <span>{l}</span> : l.kind === 'effect_added' ? (
+                            <span><strong style={{ color: getColorForActor(l.actorOrigId, l.actorId) }}>{l.actorName}</strong> adicionou <strong>{l.effectName}</strong> (<em>{l.dice}</em>{l.duration ? `, duração: ${l.duration}` : ''})</span>
+                          ) : l.kind === 'effect_result' ? (
+                            <span>
+                              <strong style={{ color: getColorForActor(l.actorOrigId, l.actorId) }}>{l.actorName}</strong>
+                              {' '}
+                              {l.op === 'sub' ? 'sofre' : l.op === 'add' ? 'recupera' : 'rola'}
+                              {' '}
+                              <strong>{l.detail}</strong>
+                              {' '}
+                              {l.op === 'none' ? `para ${l.effectName}` : `por ${l.effectName}`}
+                            </span>
+                          ) : l.kind === 'effect_expired' ? (
+                            <span><strong style={{ color: getColorForActor(l.actorOrigId, l.actorId) }}>{l.actorName}</strong> — efeito <strong>{l.effectName}</strong> expirou.</span>
+                          ) : (
+                            <span>{l.t || JSON.stringify(l)}</span>
+                          ) }
+                        </div>
+                        <div style={{ fontSize: 11, color: '#6b7280' }}>{new Date(l.time).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function App() {
+        const palette = ['#F97316','#60A5FA','#34D399','#F472B6','#A78BFA','#FCA5A5','#FACC15','#38BDF8','#FB923C','#84CC16','#F59E0B','#EF4444'];
+        const [tab, setTab] = useState('Ficha');
+        const [fichaSubTab, setFichaSubTab] = useState('Players');
+
+        const [players, setPlayers] = useState([{ id: 1, nome: 'Jogador 1', nivel: 1, nex: 0, idade: 25, expVida: 80, pv: 10, pvMax: 100, pvTemp: 0, pe: 5, peMax: 50, peTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, fome: 0, fomeMax: 10, desloc: 6, defesa: 10, bloqueio: 5, esquiva: 5, iniciativa: 10 }]);
+        const [npcs, setNpcs] = useState([]);
+        const [inimigos, setInimigos] = useState([]);
+
+        // file input ref for import
+        const fileRef = useRef(null);
+
+        function addPlayer() { setPlayers(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `Jogador ${p.length+1}`, nivel: 1, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, pe: 5, peMax: 50, peTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, fome: 0, fomeMax: 10, desloc: 6, defesa: 10, bloqueio: 5, esquiva: 5, iniciativa: 10 }])); }
+        function updateFicha(idx, newData) { setPlayers(arr => arr.map((f,i) => i === idx ? { ...f, ...newData } : f)); }
+        function deleteFicha(idx) { setPlayers(arr => arr.filter((_, i) => i !== idx)); }
+
+        function addNpc() { setNpcs(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `NPC ${p.length+1}`, tipo: 'pessoa', nivel: undefined, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, desloc: 6, defesa: 10, bloqueio: 0, esquiva: 0, iniciativa:5 }])); }
+        function updateNpc(idx, newData) { setNpcs(arr => arr.map((f,i) => i === idx ? { ...f, ...newData } : f)); }
+        function deleteNpc(idx) { setNpcs(arr => arr.filter((_, i) => i !== idx)); }
+
+        function addInimigo() { setInimigos(p => p.concat([{ id: Date.now() + Math.floor(Math.random()*10000), nome: `Inimigo ${p.length+1}`, tipo: 'pessoa', vd: 0, nivel: undefined, nex: 0, idade: 18, expVida: 70, pv: 10, pvMax: 100, pvTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, desloc: 6, defesa: 10, bloqueio: 0, esquiva: 0, iniciativa:8 }])); }
+        function updateInimigo(idx, newData) { setInimigos(arr => arr.map((f,i) => i === idx ? { ...f, ...newData } : f)); }
+        function deleteInimigo(idx) { setInimigos(arr => arr.filter((_, i) => i !== idx)); }
+
+        // callbacks to sync PV from scene effects
+        function onPlayerChangePV(id, newPV) { if (typeof newPV === 'object') { setPlayers(prev => prev.map(p => p.id === id ? { ...p, pv: newPV.pv, pvTemp: newPV.pvTemp } : p)); } else { setPlayers(prev => prev.map(p => p.id === id ? { ...p, pv: newPV } : p)); } }
+        function onNpcChangePV(id, newPV) { if (typeof newPV === 'object') { setNpcs(prev => prev.map(n => n.id === id ? { ...n, pv: newPV.pv, pvTemp: newPV.pvTemp } : n)); } else { setNpcs(prev => prev.map(n => n.id === id ? { ...n, pv: newPV } : n)); } }
+        function onInimigoChangePV(id, newPV) { if (typeof newPV === 'object') { setInimigos(prev => prev.map(m => m.id === id ? { ...m, pv: newPV.pv, pvTemp: newPV.pvTemp } : m)); } else { setInimigos(prev => prev.map(m => m.id === id ? { ...m, pv: newPV } : m)); } }
+
+        // when Scene updates an iniciativa, propagate back to the correct ficha
+        function handleUpdateInitiative(origId, value, tipo) {
+          if (tipo === 'player') {
+            setPlayers(prev => prev.map(p => p.id === origId ? { ...p, iniciativa: value } : p));
+          } else if (tipo === 'npc') {
+            setNpcs(prev => prev.map(n => n.id === origId ? { ...n, iniciativa: value } : n));
+          } else if (tipo === 'inimigo') {
+            setInimigos(prev => prev.map(m => m.id === origId ? { ...m, iniciativa: value } : m));
+          }
+        }
+
+        // export/import/local functions (kept)
+        const STORAGE_KEY = 'contador_rodadas_app_v1';
+        function getAppStateForExport() { return { players, npcs, inimigos, sceneState: (typeof window !== 'undefined' ? window.__sceneState || null : null), version: 1, exportedAt: new Date().toISOString(), }; }
+        function downloadJSON(obj, filename = 'contador-rodadas-export.json') { try { const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); } catch (e) { alert('Erro ao gerar arquivo: '+e.message); } }
+        function handleExport() { const state = getAppStateForExport(); downloadJSON(state); }
+        function handleImportFile(file) { if (!file) return; const reader = new FileReader(); reader.onload = (ev) => { try { const parsed = JSON.parse(ev.target.result); applyImportedState(parsed); alert('Importação concluída. Verifique as fichas e a cena.'); } catch (e) { alert('Arquivo inválido: '+e.message); } }; reader.onerror = () => alert('Erro lendo arquivo'); reader.readAsText(file); }
+        function applyImportedState(obj) { if (!obj) return; if (Array.isArray(obj.players)) setPlayers(obj.players); if (Array.isArray(obj.npcs)) setNpcs(obj.npcs); if (Array.isArray(obj.inimigos)) setInimigos(obj.inimigos); if (obj.sceneState) { try { window.__sceneState = obj.sceneState; } catch (e) {} } }
+        function handleImportClick() { if (fileRef.current) fileRef.current.click(); }
+        function handleSaveLocal() { try { const state = getAppStateForExport(); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); alert('Salvo no localStorage.'); } catch (e) { alert('Erro ao salvar localmente: '+e.message); } }
+        function handleLoadLocal() { try { const raw = localStorage.getItem(STORAGE_KEY); if (!raw) { alert('Nenhum estado salvo localmente.'); return; } const parsed = JSON.parse(raw); applyImportedState(parsed); alert('Estado carregado do localStorage.'); } catch (e) { alert('Erro ao carregar local: '+e.message); } }
+        function handleClearLocal() { if (!confirm('Deseja limpar o estado salvo no localStorage?')) return; localStorage.removeItem(STORAGE_KEY); alert('LocalStorage limpo.'); }
+
+        useEffect(()=>{ try { window.__APP_EXPORT = () => getAppStateForExport(); window.__APP_IMPORT = (obj) => applyImportedState(obj || {}); } catch (e) {} }, [players, npcs, inimigos]);
+
+        return (
+          <div className="min-h-screen flex items-center justify-center p-6">
+            <div className="w-full max-w-6xl">
+              <div className="mb-4 flex gap-2">
+                <button className={`tab-btn ${tab === 'Ficha' ? 'active' : ''}`} onClick={() => setTab('Ficha')}>Ficha</button>
+                <button className={`tab-btn ${tab === 'Cena' ? 'active' : ''}`} onClick={() => setTab('Cena')}>Cena</button>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                  <button className="btn-yellow px-3 py-2 rounded-lg" onClick={handleExport} title="Exportar tudo">Exportar</button>
+                  <button className="tab-btn px-3 py-2 rounded-lg" onClick={handleImportClick} title="Importar JSON">Importar</button>
+                  <input ref={fileRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={e=>{ if (e.target.files && e.target.files[0]) handleImportFile(e.target.files[0]); e.target.value = null; }} />
+                  <button className="tab-btn px-3 py-2 rounded-lg" onClick={handleSaveLocal} title="Salvar local">Salvar Local</button>
+                  <button className="tab-btn px-3 py-2 rounded-lg" onClick={handleLoadLocal} title="Carregar local">Carregar Local</button>
+                  <button className="tab-btn px-3 py-2 rounded-lg" onClick={handleClearLocal} title="Limpar local">Limpar Local</button>
+                </div>
+              </div>
+
+              {tab === 'Ficha' && (
+                <div className="card-bg rounded-2xl p-6">
+                  <div className="ficha-header">
+                    <h1 className="text-2xl font-semibold text-center mb-6" style={{ color: '#fff' }}>Fichas dos Combatentes</h1>
+                    <div>
+                      {fichaSubTab === 'Players' && <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addPlayer}>Adicionar Player</button>}
+                      {fichaSubTab === 'NPCs' && <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addNpc}>Adicionar NPC</button>}
+                      {fichaSubTab === 'Desafios' && <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addInimigo}>Adicionar Desafio</button>}
+                    </div>
+                  </div>
+
+                  <div className="ficha-subtabs">
+                    <div className={`ficha-subtab ${fichaSubTab === 'Players' ? 'active' : ''}`} onClick={() => setFichaSubTab('Players')}>Players</div>
+                    <div className={`ficha-subtab ${fichaSubTab === 'NPCs' ? 'active' : ''}`} onClick={() => setFichaSubTab('NPCs')}>NPCs</div>
+                    <div className={`ficha-subtab ${fichaSubTab === 'Desafios' ? 'active' : ''}`} onClick={() => setFichaSubTab('Desafios')}>Desafios</div>
+                  </div>
+
+                  <div className="ficha-grid">
+                    {fichaSubTab === 'Players' && players.map((p, i) => (
+                      <FichaPlayer key={p.id} data={p} color={palette[i % palette.length]} onChange={v => updateFicha(i, v)} onDelete={() => deleteFicha(i)} />
+                    ))}
+
+                    {fichaSubTab === 'NPCs' && npcs.map((n, i) => (
+                      <FichaNPC key={n.id} data={n} color={palette[i % palette.length]} onChange={v => updateNpc(i, v)} onDelete={() => deleteNpc(i)} />
+                    ))}
+
+                    {fichaSubTab === 'Desafios' && inimigos.map((m, i) => (
+                      <FichaNPC key={m.id} data={m} color={palette[i % palette.length]} label="Desafio" onChange={v => updateInimigo(i, v)} onDelete={() => deleteInimigo(i)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {tab === 'Cena' && (
+                <div className="card-bg rounded-2xl p-6">
+                  <h1 className="text-2xl font-semibold text-center mb-6" style={{ color: '#fff' }}>Cena</h1>
+                  <Scene sourcePlayers={players} sourceNpcs={npcs} sourceInimigos={inimigos} onPlayerChangePV={onPlayerChangePV} onNpcChangePV={onNpcChangePV} onInimigoChangePV={onInimigoChangePV} onUpdateInitiative={handleUpdateInitiative} />
+                </div>
+              )}
+
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
