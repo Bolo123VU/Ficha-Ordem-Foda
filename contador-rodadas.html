@@ -103,10 +103,18 @@
           const faces = Math.max(1, parseInt(m[2],10));
           const mod = m[3] ? parseInt(m[3],10) : 0;
           const rolls = [];
-          let sum = 0;
-          for (let i=0;i<n;i++) { const r = Math.floor(Math.random()*faces)+1; rolls.push(r); sum += r; }
-          const amount = sum + mod;
-          const detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
+          for (let i=0;i<n;i++) { rolls.push(Math.floor(Math.random()*faces)+1); }
+          let amount;
+          let detail;
+          if (faces === 20 && n > 1) {
+            // Para Xd20, usar o maior resultado (vantagem)
+            amount = Math.max(...rolls) + mod;
+            detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => max(${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
+          } else {
+            // padrão: soma dos dados
+            amount = rolls.reduce((a,b)=>a+b,0) + mod;
+            detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
+          }
           return { raw, op, amount, rolls, detail };
         }
         const asNum = Number(body);
