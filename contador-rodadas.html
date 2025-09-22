@@ -223,7 +223,10 @@
             </div></div>
 
             <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Iniciativa</label>
-              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+              <div className="flex gap-2">
+                <input className="input-dark w-16 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+                <input className="input-dark flex-1 p-1 rounded text-center text-sm" placeholder="ex: 1d20+2" value={d.dadoIniciativa||''} onChange={e=>onChange({...d,dadoIniciativa:e.target.value})} title="Expressão de dado para rolagem automática de iniciativa" />
+              </div>
             </div>
 
             <button className="absolute bottom-3 right-3 p-1 rounded bg-gray-800 text-gray-200 border border-gray-600" title="Max travado" tabIndex={-1} type="button">🔒</button>
@@ -252,7 +255,10 @@
             {/* ... campos (igual ao anterior) ... */}
 
             <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Iniciativa</label>
-              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+              <div className="flex gap-2">
+                <input className="input-dark w-16 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+                <input className="input-dark flex-1 p-1 rounded text-center text-sm" placeholder="ex: 1d20+2" value={d.dadoIniciativa||''} onChange={e=>onChange({...d,dadoIniciativa:e.target.value})} title="Expressão de dado para rolagem automática de iniciativa" />
+              </div>
             </div>
 
           </div>
@@ -414,12 +420,57 @@
           });
         }
 
+        function rollInitiativeForList(list) {
+          const updatedList = list.map(c => {
+            let dadoIniciativa;
+            
+            // Get the dice expression for this combatant type
+            if (c.tipo === 'player') {
+              const player = sourcePlayers.find(p => p.id === c.origId);
+              dadoIniciativa = player?.dadoIniciativa;
+            } else if (c.tipo === 'npc') {
+              const npc = sourceNpcs.find(n => n.id === c.origId);
+              dadoIniciativa = npc?.dadoIniciativa;
+            } else if (c.tipo === 'inimigo') {
+              const inimigo = sourceInimigos.find(m => m.id === c.origId);
+              dadoIniciativa = inimigo?.dadoIniciativa;
+            }
+
+            // If there's a dice expression, roll it; otherwise keep current initiative
+            if (dadoIniciativa && dadoIniciativa.trim()) {
+              const roll = rollMulti(dadoIniciativa);
+              const newInitiative = Math.max(0, roll.total);
+              
+              // Update the original ficha data too
+              try {
+                onUpdateInitiative(c.origId, newInitiative, c.tipo);
+              } catch (e) {}
+              
+              return { ...c, iniciativa: newInitiative };
+            }
+            
+            return c;
+          });
+          
+          // Sort by initiative in descending order
+          updatedList.sort((a, b) => safeNum(b.iniciativa) - safeNum(a.iniciativa));
+          return updatedList;
+        }
+
         function resetScene() {
           setRound(1);
           setTurnIndex(0);
-          setCombatants(initialList());
+          const newList = initialList();
+          const rolledList = rollInitiativeForList(newList);
+          setCombatants(rolledList);
           setLog([]);
           try { if (typeof window !== 'undefined') window.__sceneState = null; } catch (e) {}
+        }
+
+        function rollInitiativesOnly() {
+          const rolledList = rollInitiativeForList([...combatants]);
+          setCombatants(rolledList);
+          setTurnIndex(0); // Reset to first combatant after reordering
         }
 
         const filteredLogs = log.filter(l => {
@@ -438,6 +489,7 @@
               </div>
               <div className="scene-controls">
                 <button className="tab-btn" onClick={nextTurn}>Próximo Turno</button>
+                <button className="btn-yellow" onClick={rollInitiativesOnly} title="Rolar iniciativa de todos usando os dados configurados">Rolar Iniciativas</button>
                 <button className="tab-btn" onClick={resetScene}>Resetar</button>
               </div>
             </div>
@@ -450,7 +502,25 @@
                     <div className="combatant-top">
                       <input className="input-dark px-2 py-1 rounded w-full text-base font-semibold" value={c.nome} onChange={e => updateCombatant(i, { nome: e.target.value })} />
                       {/* iniciativa: editable but changes propagate back to Ficha via onUpdateInitiative provided by App */}
-                      <input className="input-dark px-2 py-1 rounded font-semibold init-input text-center" type="number" value={c.iniciativa} onChange={e => { const val = Number(e.target.value)||0; updateCombatant(i, { iniciativa: val }); }} title="Edite iniciativa (sincroniza com a Ficha)" />
+                      <div className="flex items-center gap-1">
+                        <input className="input-dark px-2 py-1 rounded font-semibold init-input text-center" type="number" value={c.iniciativa} onChange={e => { const val = Number(e.target.value)||0; updateCombatant(i, { iniciativa: val }); }} title="Edite iniciativa (sincroniza com a Ficha)" />
+                        {(() => {
+                          let dadoIniciativa;
+                          if (c.tipo === 'player') {
+                            const player = sourcePlayers.find(p => p.id === c.origId);
+                            dadoIniciativa = player?.dadoIniciativa;
+                          } else if (c.tipo === 'npc') {
+                            const npc = sourceNpcs.find(n => n.id === c.origId);
+                            dadoIniciativa = npc?.dadoIniciativa;
+                          } else if (c.tipo === 'inimigo') {
+                            const inimigo = sourceInimigos.find(m => m.id === c.origId);
+                            dadoIniciativa = inimigo?.dadoIniciativa;
+                          }
+                          return dadoIniciativa && dadoIniciativa.trim() ? (
+                            <span className="text-xs text-gray-400" title={`Dado de iniciativa: ${dadoIniciativa}`}>🎲</span>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
 
                     <div style={{ marginTop: 8 }}>
