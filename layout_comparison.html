@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Initiative Layout Comparison</title>
+    <style>
+        body { font-family: sans-serif; background: #f5f5f5; padding: 20px; }
+        .comparison { display: flex; gap: 40px; }
+        .section { flex: 1; }
+        .card { background: #42495a; color: white; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+        .old-layout .init-top { display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 4px; }
+        .new-layout .init-data { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
+        .init-buttons { display: flex; gap: 4px; margin-top: 4px; }
+        .btn { padding: 4px 8px; border-radius: 4px; border: none; color: white; font-size: 11px; }
+        .btn-blue { background: #2563eb; }
+        .btn-green { background: #16a34a; }
+        .input-dark { background: #242834; color: white; border: 1px solid #444; padding: 4px 8px; border-radius: 4px; }
+        .data-section { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+        h2 { color: #333; }
+        .highlight { background: yellow; color: black; padding: 2px 4px; border-radius: 2px; }
+    </style>
+</head>
+<body>
+    <h1>Initiative System Layout Change</h1>
+    <div class="comparison">
+        <div class="section">
+            <h2>ANTES (Old Layout)</h2>
+            <div class="card old-layout">
+                <div class="init-top">
+                    <span>Player 1</span>
+                    <span class="highlight">Iniciativa: <input class="input-dark" type="number" value="15" style="width: 60px;"></span>
+                </div>
+                <div style="margin-top: 8px; color: #888;">Sem efeitos</div>
+                <div class="data-section">
+                    <span>PV: 20</span>
+                    <span style="margin-left: 8px;">PE: 15</span>
+                    <span style="margin-left: 8px;">Est: 8</span>
+                </div>
+            </div>
+            <p><strong>Problema:</strong> Iniciativa ficava na linha do nome (ao lado), separada dos outros dados do personagem.</p>
+        </div>
+        
+        <div class="section">
+            <h2>DEPOIS (New Layout)</h2>
+            <div class="card new-layout">
+                <div style="padding: 8px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+                    <span>Player 1</span>
+                </div>
+                <div style="margin-top: 8px; color: #888;">Sem efeitos</div>
+                <div class="data-section">
+                    <span>PV: 20</span>
+                    <span style="margin-left: 8px;">PE: 15</span>
+                    <span style="margin-left: 8px;">Est: 8</span>
+                    <div class="init-data highlight">
+                        <span>Iniciativa: <input class="input-dark" type="number" value="15" style="width: 60px;"></span>
+                        <div class="init-buttons">
+                            <button class="btn btn-blue">Rolar 1d20</button>
+                            <button class="btn btn-green">2d20</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p><strong>Solução:</strong> Iniciativa agora está junto com os dados do personagem, com botões de rolagem diretamente na Cena.</p>
+        </div>
+    </div>
+    
+    <h2>Benefícios da Nova Layout:</h2>
+    <ul>
+        <li>✅ Iniciativa fica junto com os outros dados (PV, PE, Est)</li>
+        <li>✅ Botões de rolagem disponíveis diretamente na aba Cena</li>  
+        <li>✅ Resultados aparecem no log e não somem ao trocar de aba</li>
+        <li>✅ Layout mais organizado e consistente</li>
+    </ul>
+</body>
+</html>

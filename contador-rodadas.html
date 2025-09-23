@@ -540,7 +540,7 @@
                             updateCombatant(i, { iniciativa: result.amount });
                             onUpdateInitiative(c.origId, c.tipo, result.amount);
                             
-                            // Add to log
+                            // Add to log - both local state and global state
                             const logEntry = {
                               kind: 'initiative_roll',
                               actorId: c.id,
@@ -553,6 +553,14 @@
                               time: new Date()
                             };
                             setLog(prev => [logEntry, ...prev]);
+                            
+                            // Also update global scene state for persistence
+                            if (typeof window !== 'undefined' && window.__sceneState) {
+                              try {
+                                const currentLog = window.__sceneState.log || [];
+                                window.__sceneState.log = [logEntry, ...currentLog];
+                              } catch (e) {}
+                            }
                           }}>Rolar 1d20</button>
                           <button className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded" onClick={() => {
                             // Create a roll initiative function for the scene with advantage
@@ -560,7 +568,7 @@
                             updateCombatant(i, { iniciativa: result.amount });
                             onUpdateInitiative(c.origId, c.tipo, result.amount);
                             
-                            // Add to log
+                            // Add to log - both local state and global state
                             const logEntry = {
                               kind: 'initiative_roll',
                               actorId: c.id,
@@ -573,6 +581,14 @@
                               time: new Date()
                             };
                             setLog(prev => [logEntry, ...prev]);
+                            
+                            // Also update global scene state for persistence
+                            if (typeof window !== 'undefined' && window.__sceneState) {
+                              try {
+                                const currentLog = window.__sceneState.log || [];
+                                window.__sceneState.log = [logEntry, ...currentLog];
+                              } catch (e) {}
+                            }
                           }} title="Vantagem">2d20</button>
                         </div>
                       </div>
