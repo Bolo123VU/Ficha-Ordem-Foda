@@ -281,7 +281,7 @@
         );
       }
 
-      function Scene({ sourcePlayers = [], sourceNpcs = [], sourceInimigos = [], onPlayerChangePV = () => {}, onNpcChangePV = () => {}, onInimigoChangePV = () => {}, onUpdateInitiative = () => {} }) {
+      function Scene({ sourcePlayers = [], sourceNpcs = [], sourceInimigos = [], onPlayerChangePV = () => {}, onNpcChangePV = () => {}, onInimigoChangePV = () => {}, onUpdateInitiative = () => {}, getDiceExpr = () => '1d20', setDiceExpr = () => {} }) {
         function normalizeEffect(e) {
           const name = e.name || 'Efeito';
           const dice = e.dice || e.expr || '1d6';
@@ -310,7 +310,6 @@
         const [combatants, setCombatants] = useState(() => initialList());
         const [log, setLog] = useState(savedSceneState?.log ?? []);
         const [effectInputs, setEffectInputs] = useState(savedSceneState?.effectInputs ?? {});
-        const [sceneDiceExpressions, setSceneDiceExpressions] = useState({});
 
         // palette local (mesma do App)
         const palette = ['#F97316','#60A5FA','#34D399','#F472B6','#A78BFA','#FCA5A5','#FACC15','#38BDF8','#FB923C','#84CC16','#F59E0B','#EF4444'];
@@ -348,13 +347,25 @@
         // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [sourcePlayers, sourceNpcs, sourceInimigos]);
 
-        // Helper functions for scene dice expressions
+        // Helper functions for scene dice expressions - now uses main app's dice expressions
         function getSceneDiceExpr(combatantId) {
-          return sceneDiceExpressions[combatantId] || '1d20';
+          // Extract type and id from combatant id (e.g., "p-123" -> type="player", id="123")
+          const match = combatantId.match(/^([pen])-(.+)$/);
+          if (!match) return '1d20';
+          
+          const [, prefix, id] = match;
+          const tipo = prefix === 'p' ? 'player' : prefix === 'n' ? 'npc' : 'inimigo';
+          return getDiceExpr(tipo, id);
         }
 
         function setSceneDiceExpr(combatantId, expr) {
-          setSceneDiceExpressions(prev => ({ ...prev, [combatantId]: expr }));
+          // Extract type and id from combatant id (e.g., "p-123" -> type="player", id="123")
+          const match = combatantId.match(/^([pen])-(.+)$/);
+          if (!match) return;
+          
+          const [, prefix, id] = match;
+          const tipo = prefix === 'p' ? 'player' : prefix === 'n' ? 'npc' : 'inimigo';
+          setDiceExpr(tipo, id, expr);
         }
 
         // Roll all combatants' initiatives
@@ -663,6 +674,9 @@
       }
 
       function App() {
+        // export/import/local functions constants
+        const STORAGE_KEY = 'contador_rodadas_app_v1';
+        
         const palette = ['#F97316','#60A5FA','#34D399','#F472B6','#A78BFA','#FCA5A5','#FACC15','#38BDF8','#FB923C','#84CC16','#F59E0B','#EF4444'];
         const [tab, setTab] = useState('Ficha');
         const [fichaSubTab, setFichaSubTab] = useState('Players');
@@ -672,7 +686,17 @@
         const [inimigos, setInimigos] = useState([]);
 
         // dice expressions for initiative rolls
-        const [diceExpressions, setDiceExpressions] = useState({});
+        const [diceExpressions, setDiceExpressions] = useState(() => {
+          // Load from localStorage on initialization
+          try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              return parsed.diceExpressions || {};
+            }
+          } catch (e) {}
+          return {};
+        });
 
         // Helper functions for dice expression management
         function getDiceExpr(tipo, id) {
@@ -682,7 +706,19 @@
 
         function setDiceExpr(tipo, id, expr) {
           const key = `${tipo}-${id}`;
-          setDiceExpressions(prev => ({ ...prev, [key]: expr }));
+          setDiceExpressions(prev => {
+            const newExpressions = { ...prev, [key]: expr };
+            // Auto-save to localStorage when dice expressions change
+            setTimeout(() => {
+              try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                const currentState = saved ? JSON.parse(saved) : {};
+                currentState.diceExpressions = newExpressions;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(currentState));
+              } catch (e) {}
+            }, 0);
+            return newExpressions;
+          });
         }
 
         // Enhanced roll all initiatives function
@@ -808,18 +844,17 @@
         }
 
         // export/import/local functions (kept)
-        const STORAGE_KEY = 'contador_rodadas_app_v1';
-        function getAppStateForExport() { return { players, npcs, inimigos, sceneState: (typeof window !== 'undefined' ? window.__sceneState || null : null), version: 1, exportedAt: new Date().toISOString(), }; }
+        function getAppStateForExport() { return { players, npcs, inimigos, diceExpressions, sceneState: (typeof window !== 'undefined' ? window.__sceneState || null : null), version: 1, exportedAt: new Date().toISOString(), }; }
         function downloadJSON(obj, filename = 'contador-rodadas-export.json') { try { const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); } catch (e) { alert('Erro ao gerar arquivo: '+e.message); } }
         function handleExport() { const state = getAppStateForExport(); downloadJSON(state); }
         function handleImportFile(file) { if (!file) return; const reader = new FileReader(); reader.onload = (ev) => { try { const parsed = JSON.parse(ev.target.result); applyImportedState(parsed); alert('Importação concluída. Verifique as fichas e a cena.'); } catch (e) { alert('Arquivo inválido: '+e.message); } }; reader.onerror = () => alert('Erro lendo arquivo'); reader.readAsText(file); }
-        function applyImportedState(obj) { if (!obj) return; if (Array.isArray(obj.players)) setPlayers(obj.players); if (Array.isArray(obj.npcs)) setNpcs(obj.npcs); if (Array.isArray(obj.inimigos)) setInimigos(obj.inimigos); if (obj.sceneState) { try { window.__sceneState = obj.sceneState; } catch (e) {} } }
+        function applyImportedState(obj) { if (!obj) return; if (Array.isArray(obj.players)) setPlayers(obj.players); if (Array.isArray(obj.npcs)) setNpcs(obj.npcs); if (Array.isArray(obj.inimigos)) setInimigos(obj.inimigos); if (obj.diceExpressions && typeof obj.diceExpressions === 'object') setDiceExpressions(obj.diceExpressions); if (obj.sceneState) { try { window.__sceneState = obj.sceneState; } catch (e) {} } }
         function handleImportClick() { if (fileRef.current) fileRef.current.click(); }
         function handleSaveLocal() { try { const state = getAppStateForExport(); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); alert('Salvo no localStorage.'); } catch (e) { alert('Erro ao salvar localmente: '+e.message); } }
         function handleLoadLocal() { try { const raw = localStorage.getItem(STORAGE_KEY); if (!raw) { alert('Nenhum estado salvo localmente.'); return; } const parsed = JSON.parse(raw); applyImportedState(parsed); alert('Estado carregado do localStorage.'); } catch (e) { alert('Erro ao carregar local: '+e.message); } }
         function handleClearLocal() { if (!confirm('Deseja limpar o estado salvo no localStorage?')) return; localStorage.removeItem(STORAGE_KEY); alert('LocalStorage limpo.'); }
 
-        useEffect(()=>{ try { window.__APP_EXPORT = () => getAppStateForExport(); window.__APP_IMPORT = (obj) => applyImportedState(obj || {}); } catch (e) {} }, [players, npcs, inimigos]);
+        useEffect(()=>{ try { window.__APP_EXPORT = () => getAppStateForExport(); window.__APP_IMPORT = (obj) => applyImportedState(obj || {}); } catch (e) {} }, [players, npcs, inimigos, diceExpressions]);
 
         return (
           <div className="min-h-screen flex items-center justify-center p-6">
@@ -873,7 +908,7 @@
               {tab === 'Cena' && (
                 <div className="card-bg rounded-2xl p-6">
                   <h1 className="text-2xl font-semibold text-center mb-6" style={{ color: '#fff' }}>Cena</h1>
-                  <Scene sourcePlayers={players} sourceNpcs={npcs} sourceInimigos={inimigos} onPlayerChangePV={onPlayerChangePV} onNpcChangePV={onNpcChangePV} onInimigoChangePV={onInimigoChangePV} onUpdateInitiative={handleUpdateInitiative} />
+                  <Scene sourcePlayers={players} sourceNpcs={npcs} sourceInimigos={inimigos} onPlayerChangePV={onPlayerChangePV} onNpcChangePV={onNpcChangePV} onInimigoChangePV={onInimigoChangePV} onUpdateInitiative={handleUpdateInitiative} getDiceExpr={getDiceExpr} setDiceExpr={setDiceExpr} />
                 </div>
               )}
 
