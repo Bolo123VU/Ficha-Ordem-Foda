@@ -485,8 +485,6 @@
                   <div key={c.id} className="combatant-card" style={{ border: i === turnIndex ? '2px solid #facc15' : '1px solid rgba(255,255,255,0.03)', background: i === turnIndex ? 'rgba(250,204,21,0.08)' : undefined }}>
                     <div className="combatant-top">
                       <input className="input-dark px-2 py-1 rounded w-full text-base font-semibold" value={c.nome} onChange={e => updateCombatant(i, { nome: e.target.value })} />
-                      {/* iniciativa: editable but changes propagate back to Ficha via onUpdateInitiative provided by App */}
-                      <input className="input-dark px-2 py-1 rounded font-semibold init-input text-center" type="number" value={c.iniciativa} onChange={e => { const val = Number(e.target.value)||0; updateCombatant(i, { iniciativa: val }); }} title="Edite iniciativa (sincroniza com a Ficha)" />
                     </div>
 
                     <div style={{ marginTop: 8 }}>
@@ -528,6 +526,72 @@
                           </div>
                         );
                       })()}
+
+                      {/* Iniciativa section moved here from combatant-top */}
+                      <div style={{ marginLeft: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div className="text-xs text-gray-300">Iniciativa:</div>
+                          <input className="input-dark px-2 py-1 rounded font-semibold init-input text-center" type="number" value={c.iniciativa} onChange={e => { const val = Number(e.target.value)||0; updateCombatant(i, { iniciativa: val }); }} title="Edite iniciativa (sincroniza com a Ficha)" />
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => {
+                            // Create a roll initiative function for the scene
+                            const result = rollDiceComponent('1d20');
+                            updateCombatant(i, { iniciativa: result.amount });
+                            onUpdateInitiative(c.origId, c.tipo, result.amount);
+                            
+                            // Add to log - both local state and global state
+                            const logEntry = {
+                              kind: 'initiative_roll',
+                              actorId: c.id,
+                              actorOrigId: c.origId,
+                              actorName: c.nome,
+                              tipo: c.tipo,
+                              diceExpr: '1d20',
+                              result: result.amount,
+                              detail: result.detail,
+                              time: new Date()
+                            };
+                            setLog(prev => [logEntry, ...prev]);
+                            
+                            // Also update global scene state for persistence
+                            if (typeof window !== 'undefined' && window.__sceneState) {
+                              try {
+                                const currentLog = window.__sceneState.log || [];
+                                window.__sceneState.log = [logEntry, ...currentLog];
+                              } catch (e) {}
+                            }
+                          }}>Rolar 1d20</button>
+                          <button className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded" onClick={() => {
+                            // Create a roll initiative function for the scene with advantage
+                            const result = rollDiceComponent('2d20');
+                            updateCombatant(i, { iniciativa: result.amount });
+                            onUpdateInitiative(c.origId, c.tipo, result.amount);
+                            
+                            // Add to log - both local state and global state
+                            const logEntry = {
+                              kind: 'initiative_roll',
+                              actorId: c.id,
+                              actorOrigId: c.origId,
+                              actorName: c.nome,
+                              tipo: c.tipo,
+                              diceExpr: '2d20',
+                              result: result.amount,
+                              detail: result.detail,
+                              time: new Date()
+                            };
+                            setLog(prev => [logEntry, ...prev]);
+                            
+                            // Also update global scene state for persistence
+                            if (typeof window !== 'undefined' && window.__sceneState) {
+                              try {
+                                const currentLog = window.__sceneState.log || [];
+                                window.__sceneState.log = [logEntry, ...currentLog];
+                              } catch (e) {}
+                            }
+                          }} title="Vantagem">2d20</button>
+                        </div>
+                      </div>
                     </div>
 
                     <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
