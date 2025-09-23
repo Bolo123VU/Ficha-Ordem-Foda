@@ -151,7 +151,7 @@
       ); }
 
       // Ficha components (unchanged behavior)
-      function FichaPlayer({ data = {}, onChange = () => {}, onDelete = () => {}, color }) {
+      function FichaPlayer({ data = {}, onChange = () => {}, onDelete = () => {}, color, onRollInitiative = () => {} }) {
         const [showModal, setShowModal] = useState(false);
         const d = { nome:'', nivel:0, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, pe:0, peMax:1, peTemp:0, estab:0, estabMax:1, estabTemp:0, fome:0, fomeMax:1, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:10, ...data };
         const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
@@ -230,8 +230,15 @@
               <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.esquiva} onChange={e=>onChange({...d,esquiva:Number(e.target.value)})} />
             </div></div>
 
-            <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Iniciativa</label>
-              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+            <div className="mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-200 ml-1">Iniciativa</label>
+                <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `Player ${d.id}`, '1d20')}>Rolar 1d20</button>
+              </div>
+              <div className="flex gap-1">
+                <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+                <button className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `Player ${d.id}`, '2d20')} title="Vantagem">2d20</button>
+              </div>
             </div>
 
             <button className="absolute bottom-3 right-3 p-1 rounded bg-gray-800 text-gray-200 border border-gray-600" title="Max travado" tabIndex={-1} type="button">🔒</button>
@@ -239,7 +246,7 @@
         );
       }
 
-      function FichaNPC({ data = {}, onChange = () => {}, onDelete = () => {}, color, label }) {
+      function FichaNPC({ data = {}, onChange = () => {}, onDelete = () => {}, color, label, onRollInitiative = () => {} }) {
         const [showModal, setShowModal] = useState(false);
         const d = { nome:'', tipo:'pessoa', vd:0, nivel:undefined, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, estab:0, estabMax:1, estabTemp:0, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:5, ...data };
         const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
@@ -259,8 +266,15 @@
 
             {/* ... campos (igual ao anterior) ... */}
 
-            <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Iniciativa</label>
-              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+            <div className="mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-200 ml-1">Iniciativa</label>
+                <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `${label || 'NPC'} ${d.id}`, '1d20')}>Rolar 1d20</button>
+              </div>
+              <div className="flex gap-1">
+                <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+                <button className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `${label || 'NPC'} ${d.id}`, '2d20')} title="Vantagem">2d20</button>
+              </div>
             </div>
 
           </div>
@@ -307,6 +321,20 @@
 
         // persist some scene state (round/turn/log/effects) but NOT iniciativa — iniciativa sempre vem da ficha
         useEffect(() => { try { const toSave = { round, turnIndex, log, effectInputs }; window.__sceneState = toSave; } catch (e) { /* ignore */ } }, [round, turnIndex, log, effectInputs]);
+
+        // sync log with external updates (for initiative rolls from App component)
+        useEffect(() => {
+          const interval = setInterval(() => {
+            try {
+              if (window.__sceneState && window.__sceneState.log && Array.isArray(window.__sceneState.log)) {
+                setLog(window.__sceneState.log);
+              }
+            } catch (e) {
+              // ignore
+            }
+          }, 200); // Check every 200ms for log updates
+          return () => clearInterval(interval);
+        }, []);
 
         // rebuild combatants whenever ficha muda so CENA follows FICHA (this ensures initiatives come from Ficha)
         useEffect(()=>{
@@ -433,7 +461,7 @@
         const filteredLogs = log.filter(l => {
           if (!l) return false;
           if (typeof l === 'string') return l.includes('Efeito');
-          if (typeof l === 'object' && l.kind) return String(l.kind).startsWith('effect');
+          if (typeof l === 'object' && l.kind) return String(l.kind).startsWith('effect') || l.kind === 'initiative_roll';
           return typeof l === 'object' && (l.effectName || (l.t && String(l.t).includes('Efeito')));
         });
 
@@ -514,12 +542,18 @@
 
               <div style={{ width: 340 }}>
                 <div style={{ background: '#111827', padding: 12, borderRadius: 8 }}>
-                  <h3 className="text-lg font-semibold text-white">Log (efeitos)</h3>
+                  <h3 className="text-lg font-semibold text-white">Log (efeitos e iniciativa)</h3>
                   <div style={{ height: 420, overflow: 'auto', marginTop: 8, color: '#9ca3af' }}>
                     {filteredLogs.length === 0 ? <div className="text-gray-500">Nenhum evento ainda.</div> : filteredLogs.map((l, idx) => (
                       <div key={idx} style={{ padding: '6px 0', borderBottom: '1px dashed rgba(255,255,255,0.02)' }}>
                         <div>
-                          { typeof l === 'string' ? <span>{l}</span> : l.kind === 'effect_added' ? (
+                          { typeof l === 'string' ? <span>{l}</span> : l.kind === 'initiative_roll' ? (
+                            <span>
+                              <strong style={{ color: getColorForActor(l.actorOrigId, l.actorId) }}>{l.actorName}</strong>
+                              {' '}
+                              rolou iniciativa: <strong>{l.detail}</strong> = <strong>{l.result}</strong>
+                            </span>
+                          ) : l.kind === 'effect_added' ? (
                             <span><strong style={{ color: getColorForActor(l.actorOrigId, l.actorId) }}>{l.actorName}</strong> adicionou <strong>{l.effectName}</strong> (<em>{l.dice}</em>{l.duration ? `, duração: ${l.duration}` : ''})</span>
                           ) : l.kind === 'effect_result' ? (
                             <span>
@@ -588,6 +622,76 @@
           }
         }
 
+        // initiative rolling functions
+        function rollInitiativeForPlayer(id, name, diceExpr) {
+          const result = rollDiceComponent(diceExpr);
+          setPlayers(prev => prev.map(p => p.id === id ? { ...p, iniciativa: result.amount } : p));
+          // Add to scene log if scene exists
+          if (typeof window !== 'undefined' && window.__sceneState) {
+            const logEntry = {
+              kind: 'initiative_roll',
+              actorId: `p-${id}`,
+              actorOrigId: id,
+              actorName: name,
+              tipo: 'player',
+              diceExpr: diceExpr,
+              result: result.amount,
+              detail: result.detail,
+              time: new Date()
+            };
+            try {
+              const currentLog = window.__sceneState.log || [];
+              window.__sceneState.log = [logEntry, ...currentLog];
+            } catch (e) {}
+          }
+        }
+
+        function rollInitiativeForNpc(id, name, diceExpr) {
+          const result = rollDiceComponent(diceExpr);
+          setNpcs(prev => prev.map(n => n.id === id ? { ...n, iniciativa: result.amount } : n));
+          // Add to scene log if scene exists
+          if (typeof window !== 'undefined' && window.__sceneState) {
+            const logEntry = {
+              kind: 'initiative_roll',
+              actorId: `n-${id}`,
+              actorOrigId: id,
+              actorName: name,
+              tipo: 'npc',
+              diceExpr: diceExpr,
+              result: result.amount,
+              detail: result.detail,
+              time: new Date()
+            };
+            try {
+              const currentLog = window.__sceneState.log || [];
+              window.__sceneState.log = [logEntry, ...currentLog];
+            } catch (e) {}
+          }
+        }
+
+        function rollInitiativeForInimigo(id, name, diceExpr) {
+          const result = rollDiceComponent(diceExpr);
+          setInimigos(prev => prev.map(m => m.id === id ? { ...m, iniciativa: result.amount } : m));
+          // Add to scene log if scene exists
+          if (typeof window !== 'undefined' && window.__sceneState) {
+            const logEntry = {
+              kind: 'initiative_roll',
+              actorId: `e-${id}`,
+              actorOrigId: id,
+              actorName: name,
+              tipo: 'inimigo',
+              diceExpr: diceExpr,
+              result: result.amount,
+              detail: result.detail,
+              time: new Date()
+            };
+            try {
+              const currentLog = window.__sceneState.log || [];
+              window.__sceneState.log = [logEntry, ...currentLog];
+            } catch (e) {}
+          }
+        }
+
         // export/import/local functions (kept)
         const STORAGE_KEY = 'contador_rodadas_app_v1';
         function getAppStateForExport() { return { players, npcs, inimigos, sceneState: (typeof window !== 'undefined' ? window.__sceneState || null : null), version: 1, exportedAt: new Date().toISOString(), }; }
@@ -637,15 +741,15 @@
 
                   <div className="ficha-grid">
                     {fichaSubTab === 'Players' && players.map((p, i) => (
-                      <FichaPlayer key={p.id} data={p} color={palette[i % palette.length]} onChange={v => updateFicha(i, v)} onDelete={() => deleteFicha(i)} />
+                      <FichaPlayer key={p.id} data={p} color={palette[i % palette.length]} onChange={v => updateFicha(i, v)} onDelete={() => deleteFicha(i)} onRollInitiative={rollInitiativeForPlayer} />
                     ))}
 
                     {fichaSubTab === 'NPCs' && npcs.map((n, i) => (
-                      <FichaNPC key={n.id} data={n} color={palette[i % palette.length]} onChange={v => updateNpc(i, v)} onDelete={() => deleteNpc(i)} />
+                      <FichaNPC key={n.id} data={n} color={palette[i % palette.length]} onChange={v => updateNpc(i, v)} onDelete={() => deleteNpc(i)} onRollInitiative={rollInitiativeForNpc} />
                     ))}
 
                     {fichaSubTab === 'Desafios' && inimigos.map((m, i) => (
-                      <FichaNPC key={m.id} data={m} color={palette[i % palette.length]} label="Desafio" onChange={v => updateInimigo(i, v)} onDelete={() => deleteInimigo(i)} />
+                      <FichaNPC key={m.id} data={m} color={palette[i % palette.length]} label="Desafio" onChange={v => updateInimigo(i, v)} onDelete={() => deleteInimigo(i)} onRollInitiative={rollInitiativeForInimigo} />
                     ))}
                   </div>
                 </div>
