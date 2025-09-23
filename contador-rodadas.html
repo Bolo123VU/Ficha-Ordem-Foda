@@ -151,7 +151,7 @@
       ); }
 
       // Ficha components (unchanged behavior)
-      function FichaPlayer({ data = {}, onChange = () => {}, onDelete = () => {}, color, onRollInitiative = () => {} }) {
+      function FichaPlayer({ data = {}, onChange = () => {}, onDelete = () => {}, color, onRollInitiative = () => {}, getDiceExpr = () => '1d20', setDiceExpr = () => {} }) {
         const [showModal, setShowModal] = useState(false);
         const d = { nome:'', nivel:0, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, pe:0, peMax:1, peTemp:0, estab:0, estabMax:1, estabTemp:0, fome:0, fomeMax:1, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:10, ...data };
         const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
@@ -233,11 +233,11 @@
             <div className="mb-2">
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs text-gray-200 ml-1">Iniciativa</label>
-                <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `Player ${d.id}`, '1d20')}>Rolar 1d20</button>
               </div>
               <div className="flex gap-1">
                 <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
-                <button className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `Player ${d.id}`, '2d20')} title="Vantagem">2d20</button>
+                <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="text" placeholder="1d20" value={getDiceExpr('player', d.id)} onChange={e => setDiceExpr('player', d.id, e.target.value)} title="Expressão de dados (ex: 1d20, 2d20, 1d20+5)" />
+                <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `Player ${d.id}`, getDiceExpr('player', d.id))}>Rolar</button>
               </div>
             </div>
 
@@ -246,7 +246,7 @@
         );
       }
 
-      function FichaNPC({ data = {}, onChange = () => {}, onDelete = () => {}, color, label, onRollInitiative = () => {} }) {
+      function FichaNPC({ data = {}, onChange = () => {}, onDelete = () => {}, color, label, onRollInitiative = () => {}, getDiceExpr = () => '1d20', setDiceExpr = () => {} }) {
         const [showModal, setShowModal] = useState(false);
         const d = { nome:'', tipo:'pessoa', vd:0, nivel:undefined, nex:0, idade:0, expVida:0, pv:0, pvMax:1, pvTemp:0, estab:0, estabMax:1, estabTemp:0, desloc:0, defesa:0, bloqueio:0, esquiva:0, iniciativa:5, ...data };
         const handleAtual = (field,val,max)=> onChange({...d,[field]:Math.max(0, Math.min(Number(val)||0, max===undefined?Infinity:Number(max)))});
@@ -269,11 +269,11 @@
             <div className="mb-2">
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs text-gray-200 ml-1">Iniciativa</label>
-                <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `${label || 'NPC'} ${d.id}`, '1d20')}>Rolar 1d20</button>
               </div>
               <div className="flex gap-1">
                 <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
-                <button className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `${label || 'NPC'} ${d.id}`, '2d20')} title="Vantagem">2d20</button>
+                <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="text" placeholder="1d20" value={getDiceExpr('npc', d.id)} onChange={e => setDiceExpr('npc', d.id, e.target.value)} title="Expressão de dados (ex: 1d20, 2d20, 1d20+5)" />
+                <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `${label || 'NPC'} ${d.id}`, getDiceExpr('npc', d.id))}>Rolar</button>
               </div>
             </div>
 
@@ -310,6 +310,7 @@
         const [combatants, setCombatants] = useState(() => initialList());
         const [log, setLog] = useState(savedSceneState?.log ?? []);
         const [effectInputs, setEffectInputs] = useState(savedSceneState?.effectInputs ?? {});
+        const [sceneDiceExpressions, setSceneDiceExpressions] = useState({});
 
         // palette local (mesma do App)
         const palette = ['#F97316','#60A5FA','#34D399','#F472B6','#A78BFA','#FCA5A5','#FACC15','#38BDF8','#FB923C','#84CC16','#F59E0B','#EF4444'];
@@ -346,6 +347,47 @@
           setTurnIndex(newIndex>=0?newIndex:0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [sourcePlayers, sourceNpcs, sourceInimigos]);
+
+        // Helper functions for scene dice expressions
+        function getSceneDiceExpr(combatantId) {
+          return sceneDiceExpressions[combatantId] || '1d20';
+        }
+
+        function setSceneDiceExpr(combatantId, expr) {
+          setSceneDiceExpressions(prev => ({ ...prev, [combatantId]: expr }));
+        }
+
+        // Roll all combatants' initiatives
+        function rollAllSceneInitiatives() {
+          combatants.forEach((c, i) => {
+            const diceExpr = getSceneDiceExpr(c.id);
+            const result = rollDiceComponent(diceExpr);
+            updateCombatant(i, { iniciativa: result.amount });
+            onUpdateInitiative(c.origId, c.tipo, result.amount);
+            
+            // Add to log
+            const logEntry = {
+              kind: 'initiative_roll',
+              actorId: c.id,
+              actorOrigId: c.origId,
+              actorName: c.nome,
+              tipo: c.tipo,
+              diceExpr: diceExpr,
+              result: result.amount,
+              detail: result.detail,
+              time: new Date()
+            };
+            setLog(prev => [logEntry, ...prev]);
+            
+            // Also update global scene state for persistence
+            if (typeof window !== 'undefined' && window.__sceneState) {
+              try {
+                const currentLog = window.__sceneState.log || [];
+                window.__sceneState.log = [logEntry, ...currentLog];
+              } catch (e) {}
+            }
+          });
+        }
 
         function setTempEffectField(id, field, value) { setEffectInputs(prev=> ({ ...prev, [id]: { ...(prev[id]||{}), [field]: value } })); }
 
@@ -473,6 +515,7 @@
                 <div className="text-sm text-gray-300">Turno: <span className="font-bold text-yellow-400">{turnIndex + 1}</span> / <span>{combatants.length || 0}</span></div>
               </div>
               <div className="scene-controls">
+                <button className="tab-btn" onClick={rollAllSceneInitiatives} title="Rola iniciativa para todos os combatentes">Rolar Todas Iniciativas</button>
                 <button className="tab-btn" onClick={nextTurn}>Próximo Turno</button>
                 <button className="tab-btn" onClick={resetScene}>Resetar</button>
               </div>
@@ -534,9 +577,10 @@
                           <input className="input-dark px-2 py-1 rounded font-semibold init-input text-center" type="number" value={c.iniciativa} onChange={e => { const val = Number(e.target.value)||0; updateCombatant(i, { iniciativa: val }); }} title="Edite iniciativa (sincroniza com a Ficha)" />
                         </div>
                         <div style={{ display: 'flex', gap: 4 }}>
+                          <input className="input-dark flex-1 p-1 rounded font-bold text-center text-xs" type="text" placeholder="1d20" value={getSceneDiceExpr(c.id)} onChange={e => setSceneDiceExpr(c.id, e.target.value)} title="Expressão de dados (ex: 1d20, 2d20, 1d20+5)" />
                           <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => {
-                            // Create a roll initiative function for the scene
-                            const result = rollDiceComponent('1d20');
+                            const diceExpr = getSceneDiceExpr(c.id);
+                            const result = rollDiceComponent(diceExpr);
                             updateCombatant(i, { iniciativa: result.amount });
                             onUpdateInitiative(c.origId, c.tipo, result.amount);
                             
@@ -547,7 +591,7 @@
                               actorOrigId: c.origId,
                               actorName: c.nome,
                               tipo: c.tipo,
-                              diceExpr: '1d20',
+                              diceExpr: diceExpr,
                               result: result.amount,
                               detail: result.detail,
                               time: new Date()
@@ -561,35 +605,7 @@
                                 window.__sceneState.log = [logEntry, ...currentLog];
                               } catch (e) {}
                             }
-                          }}>Rolar 1d20</button>
-                          <button className="text-xs bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded" onClick={() => {
-                            // Create a roll initiative function for the scene with advantage
-                            const result = rollDiceComponent('2d20');
-                            updateCombatant(i, { iniciativa: result.amount });
-                            onUpdateInitiative(c.origId, c.tipo, result.amount);
-                            
-                            // Add to log - both local state and global state
-                            const logEntry = {
-                              kind: 'initiative_roll',
-                              actorId: c.id,
-                              actorOrigId: c.origId,
-                              actorName: c.nome,
-                              tipo: c.tipo,
-                              diceExpr: '2d20',
-                              result: result.amount,
-                              detail: result.detail,
-                              time: new Date()
-                            };
-                            setLog(prev => [logEntry, ...prev]);
-                            
-                            // Also update global scene state for persistence
-                            if (typeof window !== 'undefined' && window.__sceneState) {
-                              try {
-                                const currentLog = window.__sceneState.log || [];
-                                window.__sceneState.log = [logEntry, ...currentLog];
-                              } catch (e) {}
-                            }
-                          }} title="Vantagem">2d20</button>
+                          }}>Rolar</button>
                         </div>
                       </div>
                     </div>
@@ -654,6 +670,41 @@
         const [players, setPlayers] = useState([{ id: 1, nome: 'Jogador 1', nivel: 1, nex: 0, idade: 25, expVida: 80, pv: 10, pvMax: 100, pvTemp: 0, pe: 5, peMax: 50, peTemp: 0, estab: 0, estabMax: 10, estabTemp: 0, fome: 0, fomeMax: 10, desloc: 6, defesa: 10, bloqueio: 5, esquiva: 5, iniciativa: 10 }]);
         const [npcs, setNpcs] = useState([]);
         const [inimigos, setInimigos] = useState([]);
+
+        // dice expressions for initiative rolls
+        const [diceExpressions, setDiceExpressions] = useState({});
+
+        // Helper functions for dice expression management
+        function getDiceExpr(tipo, id) {
+          const key = `${tipo}-${id}`;
+          return diceExpressions[key] || '1d20';
+        }
+
+        function setDiceExpr(tipo, id, expr) {
+          const key = `${tipo}-${id}`;
+          setDiceExpressions(prev => ({ ...prev, [key]: expr }));
+        }
+
+        // Enhanced roll all initiatives function
+        function rollAllInitiatives() {
+          // Roll for all players
+          players.forEach(player => {
+            const diceExpr = getDiceExpr('player', player.id);
+            rollInitiativeForPlayer(player.id, player.nome, diceExpr);
+          });
+          
+          // Roll for all NPCs
+          npcs.forEach(npc => {
+            const diceExpr = getDiceExpr('npc', npc.id);
+            rollInitiativeForNpc(npc.id, npc.nome, diceExpr);
+          });
+          
+          // Roll for all enemies
+          inimigos.forEach(inimigo => {
+            const diceExpr = getDiceExpr('inimigo', inimigo.id);
+            rollInitiativeForInimigo(inimigo.id, inimigo.nome, diceExpr);
+          });
+        }
 
         // file input ref for import
         const fileRef = useRef(null);
@@ -805,15 +856,15 @@
 
                   <div className="ficha-grid">
                     {fichaSubTab === 'Players' && players.map((p, i) => (
-                      <FichaPlayer key={p.id} data={p} color={palette[i % palette.length]} onChange={v => updateFicha(i, v)} onDelete={() => deleteFicha(i)} onRollInitiative={rollInitiativeForPlayer} />
+                      <FichaPlayer key={p.id} data={p} color={palette[i % palette.length]} onChange={v => updateFicha(i, v)} onDelete={() => deleteFicha(i)} onRollInitiative={rollInitiativeForPlayer} getDiceExpr={getDiceExpr} setDiceExpr={setDiceExpr} />
                     ))}
 
                     {fichaSubTab === 'NPCs' && npcs.map((n, i) => (
-                      <FichaNPC key={n.id} data={n} color={palette[i % palette.length]} onChange={v => updateNpc(i, v)} onDelete={() => deleteNpc(i)} onRollInitiative={rollInitiativeForNpc} />
+                      <FichaNPC key={n.id} data={n} color={palette[i % palette.length]} onChange={v => updateNpc(i, v)} onDelete={() => deleteNpc(i)} onRollInitiative={rollInitiativeForNpc} getDiceExpr={getDiceExpr} setDiceExpr={setDiceExpr} />
                     ))}
 
                     {fichaSubTab === 'Desafios' && inimigos.map((m, i) => (
-                      <FichaNPC key={m.id} data={m} color={palette[i % palette.length]} label="Desafio" onChange={v => updateInimigo(i, v)} onDelete={() => deleteInimigo(i)} onRollInitiative={rollInitiativeForInimigo} />
+                      <FichaNPC key={m.id} data={m} color={palette[i % palette.length]} label="Desafio" onChange={v => updateInimigo(i, v)} onDelete={() => deleteInimigo(i)} onRollInitiative={rollInitiativeForInimigo} getDiceExpr={getDiceExpr} setDiceExpr={setDiceExpr} />
                     ))}
                   </div>
                 </div>
