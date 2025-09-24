@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Scene Layout</title>
+    <style>
+        body { background: #202632; color: #fff; font-family: Arial, sans-serif; padding: 20px; }
+        .scene-panel { background: #1f2937; padding: 1rem; border-radius: 0.75rem; }
+        .combatant-card { border-radius: 8px; padding: 0.85rem; background: rgba(255,255,255,0.03); margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.03); }
+        .combatant-top-panel { background: rgba(255,255,255,0.02); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; border: 1px solid rgba(255,255,255,0.05); }
+        .effects-section { margin-bottom: 0.5rem; }
+        .effect-pill { background:#2563eb; color:#fff; padding:4px 8px; border-radius:999px; display:inline-block; font-size:0.8rem; cursor: pointer; }
+        .badge-estab { background: #60a5fa !important; color: #06283d !important; font-weight: bold; padding: 2px 8px; border-radius: 6px; }
+        .badge-main { background: #facc15 !important; color: #222 !important; font-weight: bold; padding: 2px 10px; border-radius: 6px; }
+        .input-dark { background: #242834; color: #fff; border: none; outline: none; padding: 4px 8px; border-radius: 4px; }
+        .btn-yellow { background: #facc15; color: #111827; font-weight: 700; border: none; cursor: pointer; padding: 6px 12px; border-radius: 4px; }
+        .delete-btn { background: #ff2323; color: #fff; font-weight: bold; border-radius: 5px; padding: 0.16rem 0.6rem; font-size: 0.93rem; }
+        .modal-bg { position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.7); z-index:50; display:flex; align-items:center; justify-content:center; }
+        .modal-box { background:#323846; border-radius:10px; padding:1.5rem 2rem; box-shadow:0 0 18px rgba(0,0,0,0.6); max-width: 500px; }
+        .modal-btn { font-weight:bold; border-radius:5px; padding: 0.2rem 1.3rem; margin:0 8px; }
+        .modal-btn.cancel { background:#ff2323; color:#fff; border: none; cursor: pointer; }
+        .text-xs { font-size: 0.75rem; }
+        .text-sm { font-size: 0.875rem; }
+        .text-lg { font-size: 1.125rem; }
+        .text-gray-300 { color: #d1d5db; }
+        .text-gray-400 { color: #9ca3af; }
+        .text-gray-500 { color: #6b7280; }
+        .text-white { color: white; }
+        .text-yellow-200 { color: #fef08a; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mt-4 { margin-top: 1rem; }
+        .ml-2 { margin-left: 0.5rem; }
+        .flex { display: flex; }
+        .justify-center { justify-content: center; }
+        .accordion-open { border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 12px; background: rgba(255,255,255,0.02); }
+    </style>
+</head>
+<body>
+    <div class="scene-panel">
+        <h2 style="margin-bottom: 1rem;">Teste da Nova Layout da Cena</h2>
+        
+        <!-- Combatant Card -->
+        <div class="combatant-card">
+            <!-- Top panel with effects -->
+            <div class="combatant-top-panel">
+                <div class="effects-section">
+                    <!-- Stability state as effect -->
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                        <span class="effect-pill" style="background: #60a5fa;" onclick="openStabilityModal()">Traumatizado</span>
+                    </div>
+                    
+                    <!-- Regular effects -->
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                        <span class="effect-pill">Veneno (1d4)</span>
+                        <span style="font-size: 12px; color: #cbd5e1;">duração: 3</span>
+                        <button class="delete-btn">Remover</button>
+                    </div>
+                    
+                    <div class="text-gray-500 text-sm" style="margin-top: 6px;">Sem outros efeitos ativos</div>
+                </div>
+            </div>
+
+            <!-- Name input -->
+            <div style="margin-bottom: 8px;">
+                <input class="input-dark" style="width: 100%; padding: 8px; font-size: 1rem; font-weight: 600;" value="Personagem Teste" readonly />
+            </div>
+
+            <!-- Stats row: PV, PE, Est, Iniciativa - ALIGNED! -->
+            <div style="margin-top: 8px; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <div class="text-xs text-gray-300">PV:</div>
+                <input class="input-dark" style="width: 7rem; padding: 4px; font-weight: bold; text-align: center;" value="85" readonly />
+                
+                <div class="text-xs text-gray-300" style="margin-left: 0.5rem;">PE:</div>
+                <span class="badge-main">25</span>
+                
+                <!-- Estabilidade section - NOW ALIGNED! -->
+                <div class="text-xs text-gray-300" style="margin-left: 0.5rem;">Est:</div>
+                <span class="badge-estab">2</span>
+                
+                <!-- Iniciativa section -->
+                <div style="margin-left: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <div class="text-xs text-gray-300">Iniciativa:</div>
+                        <input class="input-dark" style="width: 70px; padding: 4px; font-weight: 600; text-align: center;" value="15" />
+                    </div>
+                    <div style="display: flex; gap: 4px;">
+                        <input class="input-dark" style="flex: 1; padding: 4px; font-weight: bold; text-align: center; font-size: 0.75rem;" value="1d20" />
+                        <button style="font-size: 0.75rem; background: #2563eb; color: white; padding: 4px 8px; border-radius: 4px; border: none;">Rolar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add effects input section - accordion style -->
+            <div style="margin-top: 8px;">
+                <!-- Closed state -->
+                <div id="accordion-closed">
+                    <button class="btn-yellow" onclick="toggleAccordion()" style="padding: 6px 12px; font-size: 0.875rem;">
+                        Adicionar Efeito/Condição
+                    </button>
+                </div>
+                
+                <!-- Open state (hidden initially) -->
+                <div id="accordion-open" class="accordion-open" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span class="text-sm font-semibold text-gray-300">Adicionar Efeito/Condição</span>
+                        <button onclick="toggleAccordion()" style="font-size: 1.2rem; background: none; border: none; cursor: pointer; color: #9ca3af;">×</button>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <input class="input-dark" placeholder="Nome do efeito" style="padding: 4px; font-size: 0.875rem;" />
+                        <input class="input-dark" placeholder="Dado (ex: 1d6 ou -1d6)" style="padding: 4px; font-size: 0.875rem;" />
+                        <input class="input-dark" placeholder="Duração (0 indefinido)" style="padding: 4px; font-size: 0.875rem;" />
+                        <textarea class="input-dark" placeholder="Descrição (opcional)" rows="2" style="min-width: 200px; padding: 4px; font-size: 0.875rem; resize: vertical;"></textarea>
+                        <button class="btn-yellow">Adicionar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stability Modal (hidden initially) -->
+    <div id="stability-modal" class="modal-bg" style="display: none;">
+        <div class="modal-box">
+            <div class="mb-3 text-lg text-yellow-200 font-semibold">
+                Estado de Estabilidade - Personagem Teste
+            </div>
+            <div class="mb-4">
+                <div class="text-gray-300">
+                    <div class="mb-2">
+                        <strong class="text-white">Estado:</strong> Traumatizado (2)
+                    </div>
+                    <div>
+                        <strong class="text-white">Efeito:</strong> Você sofre um efeito de medo.
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-center mt-4">
+                <button class="modal-btn cancel" onclick="closeStabilityModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleAccordion() {
+            const closed = document.getElementById('accordion-closed');
+            const open = document.getElementById('accordion-open');
+            
+            if (closed.style.display === 'none') {
+                closed.style.display = 'block';
+                open.style.display = 'none';
+            } else {
+                closed.style.display = 'none';
+                open.style.display = 'block';
+            }
+        }
+        
+        function openStabilityModal() {
+            document.getElementById('stability-modal').style.display = 'flex';
+        }
+        
+        function closeStabilityModal() {
+            document.getElementById('stability-modal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
