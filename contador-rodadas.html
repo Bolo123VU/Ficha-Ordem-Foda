@@ -44,6 +44,27 @@
       .effect-pill { background:#2563eb; color:#fff; padding:4px 8px; border-radius:999px; display:inline-block; font-size:0.8rem; }
       .scene-controls { display:flex; gap:0.5rem; }
       
+      /* Compact effects bar styles */
+      .combatant-effects-bar {
+        display: flex;
+        gap: 12px;
+        padding: 4px 0;
+        flex-wrap: wrap;
+      }
+      .effect-pill-compact {
+        background: #2563eb;
+        color: #fff;
+        border-radius: 999px;
+        padding: 4px 12px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        font-weight: bold;
+        margin-right: 8px;
+      }
+      .effect-pill-compact:hover {
+        background: #3b82f6;
+      }
+      
       /* New styles for top panel with effects and stability */
       .combatant-top-panel { 
         background: rgba(255,255,255,0.02); 
@@ -314,13 +335,14 @@
         function normalizeEffect(e) {
           const name = e.name || 'Efeito';
           const dice = e.dice || e.expr || '1d6';
+          const description = e.description || '';
           let durRaw;
           if (typeof e.remaining === 'number') durRaw = e.remaining;
           else if (typeof e.duration === 'number') durRaw = e.duration;
           else durRaw = (e.duration === undefined ? 0 : e.duration);
           const dur = (typeof durRaw === 'number') ? durRaw : parseDurationValue(durRaw);
           const remaining = dur === 0 ? null : Math.max(1, Math.floor(dur));
-          return { name, dice, remaining };
+          return { name, dice, remaining, description };
         }
 
         function initialList() {
@@ -339,6 +361,8 @@
         const [combatants, setCombatants] = useState(() => initialList());
         const [log, setLog] = useState(savedSceneState?.log ?? []);
         const [effectInputs, setEffectInputs] = useState(savedSceneState?.effectInputs ?? {});
+        const [showEffects, setShowEffects] = useState(true);
+        const [modalEffect, setModalEffect] = useState(null);
 
         // palette local (mesma do App)
         const palette = ['#F97316','#60A5FA','#34D399','#F472B6','#A78BFA','#FCA5A5','#FACC15','#38BDF8','#FB923C','#84CC16','#F59E0B','#EF4444'];
@@ -435,7 +459,7 @@
           const cb = combatants[idx]; if (!cb) return; const id = cb.id; const tmp = effectInputs[id] || {};
           const parsed = (tmp.duration===undefined || tmp.duration==='')?0: parseDurationValue(tmp.duration);
           const remaining = parsed===0? null: parsed; // null === infinito
-          const effect = { name: (tmp.name||'').trim()||'Efeito', dice: (tmp.dice||'').trim()||'1d6', remaining };
+          const effect = { name: (tmp.name||'').trim()||'Efeito', dice: (tmp.dice||'').trim()||'1d6', remaining, description: (tmp.description||'').trim() };
           setCombatants(prev=> prev.map((c,i)=> i===idx ? {...c, effects: [...(c.effects||[]), effect]}: c));
           setEffectInputs(prev=> ({ ...prev, [id]: {} }));
           setLog(l=> ([{ kind: 'effect_added', actorId: cb.id, actorOrigId: cb.origId, actorName: cb.nome, effectName: effect.name, dice: effect.dice, duration: effect.remaining, time: new Date() }, ...l]));
@@ -569,18 +593,49 @@
                     
                     {/* Top panel with effects and stability */}
                     <div className="combatant-top-panel">
-                      {/* Effects section */}
+                      {/* Effects section with toggle and compact bar */}
                       <div className="effects-section">
-                        {(c.effects && c.effects.length > 0) ? (
-                          c.effects.map((ef, idxEf) => (
-                            <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                              <span className="effect-pill">{ef.name} ({ef.dice})</span>
-                              <span style={{ fontSize: 12, color: '#cbd5e1' }}>{ef.remaining === null ? 'indefinido' : `duração: ${ef.remaining}`}</span>
-                              <button className="delete-btn" onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <div className="text-xs text-gray-300">Efeitos:</div>
+                          <button 
+                            className="text-xs text-blue-300 hover:text-blue-200" 
+                            onClick={() => setShowEffects(v => !v)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                          >
+                            {showEffects ? "Ocultar Efeitos" : "Mostrar Efeitos"}
+                          </button>
+                        </div>
+                        
+                        {showEffects && (
+                          (c.effects && c.effects.length > 0) ? (
+                            <div className="combatant-effects-bar">
+                              {c.effects.map((ef, idxEf) => (
+                                <span 
+                                  key={idxEf} 
+                                  className="effect-pill-compact"
+                                  onClick={() => setModalEffect(ef)}
+                                  title={ef.description ? `${ef.name}: ${ef.description}` : ef.name}
+                                >
+                                  {ef.name}{ef.remaining !== null ? ` (${ef.remaining})` : ""}
+                                </span>
+                              ))}
                             </div>
-                          ))
-                        ) : (
-                          <div className="text-gray-500 text-sm">Sem efeitos ativos</div>
+                          ) : (
+                            <div className="text-gray-500 text-sm">Sem efeitos ativos</div>
+                          )
+                        )}
+                        
+                        {/* Original detailed effects (only when showEffects is true) - kept for remove buttons */}
+                        {showEffects && (c.effects && c.effects.length > 0) && (
+                          <div style={{ marginTop: 8 }}>
+                            {c.effects.map((ef, idxEf) => (
+                              <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span className="text-xs text-gray-400">{ef.name} ({ef.dice})</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8' }}>{ef.remaining === null ? 'indefinido' : `duração: ${ef.remaining}`}</span>
+                                <button className="delete-btn" style={{ fontSize: '0.7rem', padding: '2px 6px' }} onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
 
@@ -667,6 +722,7 @@
                       <input className="input-dark p-1 rounded text-sm" placeholder="Nome do efeito" value={(effectInputs[c.id] && effectInputs[c.id].name) || ''} onChange={e => setTempEffectField(c.id, 'name', e.target.value)} />
                       <input className="input-dark p-1 rounded text-sm" placeholder="Dado (ex: 1d6 ou -1d6 ou +1d6, múltiplos separados por ,)" value={(effectInputs[c.id] && effectInputs[c.id].dice) || ''} onChange={e => setTempEffectField(c.id, 'dice', e.target.value)} />
                       <input className="input-dark p-1 rounded text-sm" placeholder="Duração (0 indefinido)" value={(effectInputs[c.id] && effectInputs[c.id].duration) || ''} onChange={e => setTempEffectField(c.id, 'duration', e.target.value)} />
+                      <input className="input-dark p-1 rounded text-sm" placeholder="Descrição" value={(effectInputs[c.id] && effectInputs[c.id].description) || ''} onChange={e => setTempEffectField(c.id, 'description', e.target.value)} />
                       <button className="btn-yellow" onClick={() => addEffectTo(i)}>Adicionar Efeito</button>
                     </div>
                   </div>
@@ -711,6 +767,27 @@
                 </div>
               </div>
             </div>
+            
+            {/* Effect Description Modal */}
+            {modalEffect && (
+              <div className="modal-bg" onClick={() => setModalEffect(null)}>
+                <div className="modal-box" onClick={e => e.stopPropagation()}>
+                  <h2 style={{ color: '#facc15', marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 'bold' }}>{modalEffect.name}</h2>
+                  <div style={{ marginBottom: '1rem', color: '#e5e7eb', lineHeight: '1.5' }}>
+                    {modalEffect.description || "Sem descrição"}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#9ca3af', marginBottom: '1rem' }}>
+                    <strong>Dados:</strong> {modalEffect.dice} | <strong>Duração:</strong> {modalEffect.remaining === null ? 'Indefinido' : modalEffect.remaining}
+                  </div>
+                  <button 
+                    className="modal-btn confirm" 
+                    onClick={() => setModalEffect(null)}
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
       }
