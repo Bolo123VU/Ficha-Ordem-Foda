@@ -135,15 +135,10 @@
           for (let i=0;i<n;i++) { rolls.push(Math.floor(Math.random()*faces)+1); }
           let amount;
           let detail;
-          if (faces === 20 && n > 1) {
-            // Para Xd20, usar o maior resultado (vantagem)
-            amount = Math.max(...rolls) + mod;
-            detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => max(${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
-          } else {
-            // padrão: soma dos dados
-            amount = rolls.reduce((a,b)=>a+b,0) + mod;
-            detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
-          }
+          // Always use standard dice behavior (sum all dice) for initiative rolls
+          // The advantage logic (max) should only be used when explicitly requested
+          amount = rolls.reduce((a,b)=>a+b,0) + mod;
+          detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
           return { raw, op, amount, rolls, detail };
         }
         const asNum = Number(body);
@@ -1009,31 +1004,15 @@
               {tab === 'Ficha' && (
                 <div className="card-bg rounded-2xl p-6">
                   <div className="ficha-header">
-                    <h1 className="text-2xl font-semibold text-center mb-6" style={{ color: '#fff' }}>Fichas dos Combatentes</h1>
+                    <h1 className="text-2xl font-semibold text-center mb-6" style={{ color: '#fff' }}>Fichas dos Jogadores</h1>
                     <div>
-                      {fichaSubTab === 'Players' && <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addPlayer}>Adicionar Player</button>}
-                      {fichaSubTab === 'NPCs' && <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addNpc}>Adicionar NPC</button>}
-                      {fichaSubTab === 'Desafios' && <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addInimigo}>Adicionar Desafio</button>}
+                      <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addPlayer}>Adicionar Player</button>
                     </div>
                   </div>
 
-                  <div className="ficha-subtabs">
-                    <div className={`ficha-subtab ${fichaSubTab === 'Players' ? 'active' : ''}`} onClick={() => setFichaSubTab('Players')}>Players</div>
-                    <div className={`ficha-subtab ${fichaSubTab === 'NPCs' ? 'active' : ''}`} onClick={() => setFichaSubTab('NPCs')}>NPCs</div>
-                    <div className={`ficha-subtab ${fichaSubTab === 'Desafios' ? 'active' : ''}`} onClick={() => setFichaSubTab('Desafios')}>Desafios</div>
-                  </div>
-
                   <div className="ficha-grid">
-                    {fichaSubTab === 'Players' && players.map((p, i) => (
+                    {players.map((p, i) => (
                       <FichaPlayer key={p.id} data={p} color={palette[i % palette.length]} onChange={v => updateFicha(i, v)} onDelete={() => deleteFicha(i)} onRollInitiative={rollInitiativeForPlayer} getDiceExpr={getDiceExpr} setDiceExpr={setDiceExpr} />
-                    ))}
-
-                    {fichaSubTab === 'NPCs' && npcs.map((n, i) => (
-                      <FichaNPC key={n.id} data={n} color={palette[i % palette.length]} onChange={v => updateNpc(i, v)} onDelete={() => deleteNpc(i)} onRollInitiative={rollInitiativeForNpc} getDiceExpr={getDiceExpr} setDiceExpr={setDiceExpr} />
-                    ))}
-
-                    {fichaSubTab === 'Desafios' && inimigos.map((m, i) => (
-                      <FichaNPC key={m.id} data={m} color={palette[i % palette.length]} label="Desafio" onChange={v => updateInimigo(i, v)} onDelete={() => deleteInimigo(i)} onRollInitiative={rollInitiativeForInimigo} getDiceExpr={getDiceExpr} setDiceExpr={setDiceExpr} />
                     ))}
                   </div>
                 </div>
