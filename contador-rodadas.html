@@ -245,10 +245,6 @@
               </div>
             </div></div>
 
-            <div className="mb-2"><label className="text-xs text-gray-200 ml-1">Deslocamento</label>
-              <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.desloc} onChange={e=>onChange({...d,desloc:Number(e.target.value)})} />
-            </div>
-
             <div className="grid grid-cols-3 gap-2 mb-2"><div>
               <label className="text-xs text-gray-200 ml-1">Defesa</label>
               <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.defesa} onChange={e=>onChange({...d,defesa:Number(e.target.value)})} />
@@ -262,14 +258,18 @@
               <input className="input-dark w-full p-1 rounded font-bold text-center" type="number" min={0} value={d.esquiva} onChange={e=>onChange({...d,esquiva:Number(e.target.value)})} />
             </div></div>
 
-            <div className="mb-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs text-gray-200 ml-1">Iniciativa</label>
+            <div className="flex gap-2 mb-2">
+              <div>
+                <label className="text-xs text-gray-200 ml-1">Deslocamento</label>
+                <input className="input-dark w-16 p-1 rounded font-bold text-center" type="number" min={0} value={d.desloc} onChange={e=>onChange({...d,desloc:Number(e.target.value)})} />
               </div>
-              <div className="flex gap-1">
-                <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
-                <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="text" placeholder="1d20" value={getDiceExpr('player', d.id)} onChange={e => setDiceExpr('player', d.id, e.target.value)} title="Expressão de dados (ex: 1d20, 2d20, 1d20+5)" />
-                <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `Player ${d.id}`, getDiceExpr('player', d.id))}>Rolar</button>
+              <div className="flex-1">
+                <label className="text-xs text-gray-200 ml-1">Iniciativa</label>
+                <div className="flex gap-1">
+                  <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="number" min={0} value={d.iniciativa} onChange={e=>onChange({...d,iniciativa:Number(e.target.value)})} />
+                  <input className="input-dark flex-1 p-1 rounded font-bold text-center" type="text" placeholder="1d20" value={getDiceExpr('player', d.id)} onChange={e => setDiceExpr('player', d.id, e.target.value)} title="Expressão de dados (ex: 1d20, 2d20, 1d20+5)" />
+                  <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded" onClick={() => onRollInitiative(d.id, d.nome || `Player ${d.id}`, getDiceExpr('player', d.id))}>Rolar</button>
+                </div>
               </div>
             </div>
 
@@ -1014,7 +1014,7 @@
                   <div className="ficha-header">
                     <h1 className="text-2xl font-semibold text-center mb-6" style={{ color: '#fff' }}>Fichas dos Jogadores</h1>
                     <div>
-                      <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addPlayer}>Adicionar Player</button>
+                      <button className="btn-yellow px-4 py-2 rounded-lg ml-2" onClick={addPlayer}>➕ Player</button>
                     </div>
                   </div>
 
