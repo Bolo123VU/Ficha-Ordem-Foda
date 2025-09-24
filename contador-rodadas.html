@@ -135,10 +135,18 @@
           for (let i=0;i<n;i++) { rolls.push(Math.floor(Math.random()*faces)+1); }
           let amount;
           let detail;
-          // Always use standard dice behavior (sum all dice) for initiative rolls
-          // The advantage logic (max) should only be used when explicitly requested
-          amount = rolls.reduce((a,b)=>a+b,0) + mod;
-          detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
+          
+          // Ordem Paranormal d20 system: multiple d20s use advantage rule (take highest)
+          if (faces === 20 && n > 1) {
+            const maxRoll = Math.max(...rolls);
+            amount = maxRoll + mod;
+            detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')}) max=${maxRoll}${mod? (mod>0?`+${mod}`:`${mod}`):''} = ${amount}`;
+          } else {
+            // For other dice (not d20 or single d20), use standard sum behavior
+            amount = rolls.reduce((a,b)=>a+b,0) + mod;
+            detail = `${n}d${faces}${mod? (mod>0?`+${mod}`:`${mod}`):''} => (${rolls.join(',')})${mod? (mod>0?`+${mod}`:`${mod}`):''}`;
+          }
+          
           return { raw, op, amount, rolls, detail };
         }
         const asNum = Number(body);
