@@ -445,7 +445,12 @@
           const cb = combatants[idx]; if (!cb) return; const id = cb.id; const tmp = effectInputs[id] || {};
           const parsed = (tmp.duration===undefined || tmp.duration==='')?0: parseDurationValue(tmp.duration);
           const remaining = parsed===0? null: parsed; // null === infinito
-          const effect = { name: (tmp.name||'').trim()||'Efeito', dice: (tmp.dice||'').trim()||'1d6', remaining };
+          const effect = { 
+            name: (tmp.name||'').trim()||'Efeito', 
+            dice: (tmp.dice||'').trim()||'', 
+            remaining,
+            description: (tmp.description||'').trim()||''
+          };
           setCombatants(prev=> prev.map((c,i)=> i===idx ? {...c, effects: [...(c.effects||[]), effect]}: c));
           setEffectInputs(prev=> ({ ...prev, [id]: {} }));
           setLog(l=> ([{ kind: 'effect_added', actorId: cb.id, actorOrigId: cb.origId, actorName: cb.nome, effectName: effect.name, dice: effect.dice, duration: effect.remaining, time: new Date() }, ...l]));
@@ -474,14 +479,17 @@
 
             const newEffects = [];
             for (const e of c.effects) {
-              const res = rollMulti(e.dice || e.expr || '1d6');
+              // Skip rolling if there's no dice expression
+              if (e.dice && e.dice.trim()) {
+                const res = rollMulti(e.dice || e.expr || '1d6');
 
-              for (const d of res.details) {
-                logs.push({ kind: 'effect_result', actorId: c.id, actorOrigId: c.origId, actorName: c.nome, effectName: e.name, op: d.op, amount: d.amount, detail: d.detail || d.amount, raw: d.raw, time: new Date() });
+                for (const d of res.details) {
+                  logs.push({ kind: 'effect_result', actorId: c.id, actorOrigId: c.origId, actorName: c.nome, effectName: e.name, op: d.op, amount: d.amount, detail: d.detail || d.amount, raw: d.raw, time: new Date() });
+                }
+
+                if (res.sub>0) { const dmg = res.sub; const updated = applyDamageToCombatant(c, dmg); c.pv = updated.pv; c.pvTemp = updated.pvTemp; pvChanges.push({ id: c.id, origId: c.origId, tipo: c.tipo, pv: updated.pv, pvTemp: updated.pvTemp }); }
+                if (res.add>0) { c.pv = safeNum(c.pv) + res.add; pvChanges.push({ id: c.id, origId: c.origId, tipo: c.tipo, pv: c.pv, pvTemp: c.pvTemp }); }
               }
-
-              if (res.sub>0) { const dmg = res.sub; const updated = applyDamageToCombatant(c, dmg); c.pv = updated.pv; c.pvTemp = updated.pvTemp; pvChanges.push({ id: c.id, origId: c.origId, tipo: c.tipo, pv: updated.pv, pvTemp: updated.pvTemp }); }
-              if (res.add>0) { c.pv = safeNum(c.pv) + res.add; pvChanges.push({ id: c.id, origId: c.origId, tipo: c.tipo, pv: c.pv, pvTemp: c.pvTemp }); }
 
               if (e.remaining===null || e.remaining===undefined) { newEffects.push({ ...e, remaining: null }); }
               else if (typeof e.remaining === 'number') {
@@ -603,7 +611,10 @@
                         {(c.effects && c.effects.length > 0) && (
                           c.effects.map((ef, idxEf) => (
                             <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                              <span className="effect-pill">{ef.name} ({ef.dice})</span>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span className="effect-pill">{ef.name}{ef.dice ? ` (${ef.dice})` : ''}</span>
+                                {ef.description && <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{ef.description}</span>}
+                              </div>
                               <span style={{ fontSize: 12, color: '#cbd5e1' }}>{ef.remaining === null ? 'indefinido' : `duração: ${ef.remaining}`}</span>
                               <button className="delete-btn" onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
                             </div>
@@ -688,7 +699,7 @@
                           onClick={() => toggleEffectAccordion(c.id)}
                           style={{ padding: '6px 12px', fontSize: '0.875rem' }}
                         >
-                          Adicionar Efeito/Condição
+                          Add Efeito
                         </button>
                       ) : (
                         <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '12px', background: 'rgba(255,255,255,0.02)' }}>
@@ -704,7 +715,7 @@
                           </div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <input className="input-dark p-1 rounded text-sm" placeholder="Nome do efeito" value={(effectInputs[c.id] && effectInputs[c.id].name) || ''} onChange={e => setTempEffectField(c.id, 'name', e.target.value)} />
-                            <input className="input-dark p-1 rounded text-sm" placeholder="Dado (ex: 1d6 ou -1d6 ou +1d6, múltiplos separados por ,)" value={(effectInputs[c.id] && effectInputs[c.id].dice) || ''} onChange={e => setTempEffectField(c.id, 'dice', e.target.value)} />
+                            <input className="input-dark p-1 rounded text-sm" placeholder="Dado (opcional, ex: 1d6 ou -1d6 ou +1d6, múltiplos separados por ,)" value={(effectInputs[c.id] && effectInputs[c.id].dice) || ''} onChange={e => setTempEffectField(c.id, 'dice', e.target.value)} />
                             <input className="input-dark p-1 rounded text-sm" placeholder="Duração (0 indefinido)" value={(effectInputs[c.id] && effectInputs[c.id].duration) || ''} onChange={e => setTempEffectField(c.id, 'duration', e.target.value)} />
                             <textarea className="input-dark p-1 rounded text-sm" placeholder="Descrição (opcional)" rows="2" style={{ minWidth: '200px', resize: 'vertical' }} value={(effectInputs[c.id] && effectInputs[c.id].description) || ''} onChange={e => setTempEffectField(c.id, 'description', e.target.value)} />
                             <button className="btn-yellow" onClick={() => {
