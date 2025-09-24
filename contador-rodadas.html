@@ -43,6 +43,28 @@
       .init-input { width:70px; }
       .effect-pill { background:#2563eb; color:#fff; padding:4px 8px; border-radius:999px; display:inline-block; font-size:0.8rem; }
       .scene-controls { display:flex; gap:0.5rem; }
+      
+      /* New styles for top panel with effects and stability */
+      .combatant-top-panel { 
+        background: rgba(255,255,255,0.02); 
+        border-radius: 6px; 
+        padding: 0.75rem; 
+        margin-bottom: 0.75rem; 
+        border: 1px solid rgba(255,255,255,0.05);
+      }
+      .effects-section { margin-bottom: 0.5rem; }
+      .effects-section:last-child { margin-bottom: 0; }
+      .stability-section { 
+        display: flex; 
+        align-items: flex-start; 
+        gap: 12px; 
+        flex-wrap: wrap;
+      }
+      .stability-badge-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
 
       /* Fichas layout inside Ficha tab */
       .ficha-section { margin-bottom: 1.25rem; }
@@ -537,25 +559,51 @@
                 {combatants.length === 0 && <div className="text-gray-400">Nenhum combatente. Adicione players/NPCs/Inimigos na aba Ficha.</div>}
                 {combatants.map((c, i) => (
                   <div key={c.id} className="combatant-card" style={{ border: i === turnIndex ? '2px solid #facc15' : '1px solid rgba(255,255,255,0.03)', background: i === turnIndex ? 'rgba(250,204,21,0.08)' : undefined }}>
+                    
+                    {/* Top panel with effects and stability */}
+                    <div className="combatant-top-panel">
+                      {/* Effects section */}
+                      <div className="effects-section">
+                        {(c.effects && c.effects.length > 0) ? (
+                          c.effects.map((ef, idxEf) => (
+                            <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                              <span className="effect-pill">{ef.name} ({ef.dice})</span>
+                              <span style={{ fontSize: 12, color: '#cbd5e1' }}>{ef.remaining === null ? 'indefinido' : `duração: ${ef.remaining}`}</span>
+                              <button className="delete-btn" onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-gray-500 text-sm">Sem efeitos ativos</div>
+                        )}
+                      </div>
+
+                      {/* Stability section */}
+                      <div className="stability-section">
+                        {(() => {
+                          const estabTotal = safeNum(c.estab) + Math.max(0, safeNum(c.estabTemp || 0));
+                          const info = getEstabilidadeInfo(estabTotal);
+                          return (
+                            <>
+                              <div className="stability-badge-container">
+                                <div className="text-xs text-gray-300">Estabilidade:</div>
+                                <span className="badge-estab" title={getDescricaoEstabilidadeText(estabTotal)}>{estabTotal}</span>
+                              </div>
+                              <div className="text-xs text-gray-300">
+                                <strong>{info.label}</strong> — {info.desc}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Name input */}
                     <div className="combatant-top">
                       <input className="input-dark px-2 py-1 rounded w-full text-base font-semibold" value={c.nome} onChange={e => updateCombatant(i, { nome: e.target.value })} />
                     </div>
 
-                    <div style={{ marginTop: 8 }}>
-                      {(c.effects && c.effects.length > 0) ? (
-                        c.effects.map((ef, idxEf) => (
-                          <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                            <span className="effect-pill">{ef.name} ({ef.dice})</span>
-                            <span style={{ fontSize: 12, color: '#cbd5e1' }}>{ef.remaining === null ? 'indefinido' : `duração: ${ef.remaining}`}</span>
-                            <button className="delete-btn" onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-gray-500">Sem efeitos</div>
-                      )}
-                    </div>
-
-                    <div style={{ marginTop: 8, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {/* Stats row: PV, PE, Iniciativa */}
+                    <div style={{ marginTop: 8, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <div className="text-xs text-gray-300">PV: </div>
                       {(() => {
                         const total = safeNum(c.pv) + Math.max(0, safeNum(c.pvTemp || 0));
@@ -567,21 +615,7 @@
 
                       {c.pe !== undefined && <><div className="text-xs text-gray-300 ml-2">PE:</div><span className="badge-main">{c.pe}</span></>}
 
-                      {(() => {
-                        const estabTotal = safeNum(c.estab) + Math.max(0, safeNum(c.estabTemp || 0));
-                        const info = getEstabilidadeInfo(estabTotal);
-                        return (
-                          <div style={{ marginLeft: 12 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div className="text-xs text-gray-300">Est:</div>
-                              <span className="badge-estab" title={getDescricaoEstabilidadeText(estabTotal)}>{estabTotal}</span>
-                            </div>
-                            <div className="text-xs text-gray-300 mt-1"><strong>{info.label}</strong> — {info.desc}</div>
-                          </div>
-                        );
-                      })()}
-
-                      {/* Iniciativa section moved here from combatant-top */}
+                      {/* Iniciativa section */}
                       <div style={{ marginLeft: 12 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                           <div className="text-xs text-gray-300">Iniciativa:</div>
@@ -621,7 +655,8 @@
                       </div>
                     </div>
 
-                    <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    {/* Add effects input section */}
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input className="input-dark p-1 rounded text-sm" placeholder="Nome do efeito" value={(effectInputs[c.id] && effectInputs[c.id].name) || ''} onChange={e => setTempEffectField(c.id, 'name', e.target.value)} />
                       <input className="input-dark p-1 rounded text-sm" placeholder="Dado (ex: 1d6 ou -1d6 ou +1d6, múltiplos separados por ,)" value={(effectInputs[c.id] && effectInputs[c.id].dice) || ''} onChange={e => setTempEffectField(c.id, 'dice', e.target.value)} />
                       <input className="input-dark p-1 rounded text-sm" placeholder="Duração (0 indefinido)" value={(effectInputs[c.id] && effectInputs[c.id].duration) || ''} onChange={e => setTempEffectField(c.id, 'duration', e.target.value)} />
