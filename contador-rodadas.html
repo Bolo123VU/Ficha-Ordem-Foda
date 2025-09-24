@@ -339,8 +339,9 @@
         const [combatants, setCombatants] = useState(() => initialList());
         const [log, setLog] = useState(savedSceneState?.log ?? []);
         const [effectInputs, setEffectInputs] = useState(savedSceneState?.effectInputs ?? {});
-        // State for stability modal and effect accordion
+        // State for stability modal, effect modal and effect accordion
         const [stabilityModal, setStabilityModal] = useState({ open: false, combatant: null });
+        const [effectModal, setEffectModal] = useState({ open: false, effect: null, combatant: null });
         const [effectAccordions, setEffectAccordions] = useState({});
 
         // palette local (mesma do App)
@@ -611,10 +612,14 @@
                         {(c.effects && c.effects.length > 0) && (
                           c.effects.map((ef, idxEf) => (
                             <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <span className="effect-pill">{ef.name}{ef.dice ? ` (${ef.dice})` : ''}</span>
-                                {ef.description && <span style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{ef.description}</span>}
-                              </div>
+                              <span 
+                                className="effect-pill" 
+                                style={{ cursor: 'pointer' }}
+                                onClick={() => setEffectModal({ open: true, effect: ef, combatant: c })}
+                                title="Clique para ver descrição detalhada"
+                              >
+                                {ef.name}{ef.dice ? ` (${ef.dice})` : ''}
+                              </span>
                               <span style={{ fontSize: 12, color: '#cbd5e1' }}>{ef.remaining === null ? 'indefinido' : `duração: ${ef.remaining}`}</span>
                               <button className="delete-btn" onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
                             </div>
@@ -796,6 +801,45 @@
                     <button 
                       className="modal-btn cancel" 
                       onClick={() => setStabilityModal({ open: false, combatant: null })}
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Effect Modal */}
+            {effectModal.open && effectModal.effect && effectModal.combatant && (
+              <div className="modal-bg">
+                <div className="modal-box">
+                  <div className="mb-3 text-lg text-yellow-200 font-semibold">
+                    Efeito - {effectModal.combatant.nome}
+                  </div>
+                  <div className="mb-4">
+                    <div className="text-gray-300">
+                      <div className="mb-2">
+                        <strong className="text-white">Nome:</strong> {effectModal.effect.name}
+                      </div>
+                      {effectModal.effect.dice && (
+                        <div className="mb-2">
+                          <strong className="text-white">Dado:</strong> {effectModal.effect.dice}
+                        </div>
+                      )}
+                      <div className="mb-2">
+                        <strong className="text-white">Duração:</strong> {effectModal.effect.remaining === null ? 'indefinido' : effectModal.effect.remaining}
+                      </div>
+                      {effectModal.effect.description && (
+                        <div>
+                          <strong className="text-white">Descrição:</strong> {effectModal.effect.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-center mt-4">
+                    <button 
+                      className="modal-btn cancel" 
+                      onClick={() => setEffectModal({ open: false, effect: null, combatant: null })}
                     >
                       Fechar
                     </button>
