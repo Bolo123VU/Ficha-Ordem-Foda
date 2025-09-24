@@ -339,6 +339,9 @@
         const [combatants, setCombatants] = useState(() => initialList());
         const [log, setLog] = useState(savedSceneState?.log ?? []);
         const [effectInputs, setEffectInputs] = useState(savedSceneState?.effectInputs ?? {});
+        // State for stability modal and effect accordion
+        const [stabilityModal, setStabilityModal] = useState({ open: false, combatant: null });
+        const [effectAccordions, setEffectAccordions] = useState({});
 
         // palette local (mesma do App)
         const palette = ['#F97316','#60A5FA','#34D399','#F472B6','#A78BFA','#FCA5A5','#FACC15','#38BDF8','#FB923C','#84CC16','#F59E0B','#EF4444'];
@@ -430,6 +433,13 @@
         }
 
         function setTempEffectField(id, field, value) { setEffectInputs(prev=> ({ ...prev, [id]: { ...(prev[id]||{}), [field]: value } })); }
+
+        function toggleEffectAccordion(combatantId) {
+          setEffectAccordions(prev => ({
+            ...prev,
+            [combatantId]: !prev[combatantId]
+          }));
+        }
 
         function addEffectTo(idx) {
           const cb = combatants[idx]; if (!cb) return; const id = cb.id; const tmp = effectInputs[id] || {};
@@ -571,7 +581,26 @@
                     <div className="combatant-top-panel">
                       {/* Effects section */}
                       <div className="effects-section">
-                        {(c.effects && c.effects.length > 0) ? (
+                        {/* Add stability state as an effect */}
+                        {(() => {
+                          const estabTotal = safeNum(c.estab) + Math.max(0, safeNum(c.estabTemp || 0));
+                          const info = getEstabilidadeInfo(estabTotal);
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                              <span 
+                                className="effect-pill" 
+                                style={{ cursor: 'pointer', background: '#60a5fa' }}
+                                onClick={() => setStabilityModal({ open: true, combatant: c })}
+                                title="Clique para ver descrição detalhada"
+                              >
+                                {info.label}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        
+                        {/* Regular effects */}
+                        {(c.effects && c.effects.length > 0) && (
                           c.effects.map((ef, idxEf) => (
                             <div key={idxEf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                               <span className="effect-pill">{ef.name} ({ef.dice})</span>
@@ -579,29 +608,14 @@
                               <button className="delete-btn" onClick={() => removeEffectFrom(i, idxEf)}>Remover</button>
                             </div>
                           ))
-                        ) : (
-                          <div className="text-gray-500 text-sm">Sem efeitos ativos</div>
+                        )}
+                        
+                        {(!c.effects || c.effects.length === 0) && (
+                          <div className="text-gray-500 text-sm" style={{ marginTop: 6 }}>Sem efeitos ativos</div>
                         )}
                       </div>
 
-                      {/* Stability section */}
-                      <div className="stability-section">
-                        {(() => {
-                          const estabTotal = safeNum(c.estab) + Math.max(0, safeNum(c.estabTemp || 0));
-                          const info = getEstabilidadeInfo(estabTotal);
-                          return (
-                            <>
-                              <div className="stability-badge-container">
-                                <div className="text-xs text-gray-300">Estabilidade:</div>
-                                <span className="badge-estab" title={getDescricaoEstabilidadeText(estabTotal)}>{estabTotal}</span>
-                              </div>
-                              <div className="text-xs text-gray-300">
-                                <strong>{info.label}</strong> — {info.desc}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
+
                     </div>
 
                     {/* Name input */}
@@ -609,7 +623,7 @@
                       <input className="input-dark px-2 py-1 rounded w-full text-base font-semibold" value={c.nome} onChange={e => updateCombatant(i, { nome: e.target.value })} />
                     </div>
 
-                    {/* Stats row: PV, PE, Iniciativa */}
+                    {/* Stats row: PV, PE, Est, Iniciativa */}
                     <div style={{ marginTop: 8, display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                       <div className="text-xs text-gray-300">PV: </div>
                       {(() => {
@@ -621,6 +635,10 @@
                       })()}
 
                       {c.pe !== undefined && <><div className="text-xs text-gray-300 ml-2">PE:</div><span className="badge-main">{c.pe}</span></>}
+
+                      {/* Estabilidade section - moved to align with PV, PE, Iniciativa */}
+                      <div className="text-xs text-gray-300 ml-2">Est:</div>
+                      <span className="badge-estab">{safeNum(c.estab) + Math.max(0, safeNum(c.estabTemp || 0))}</span>
 
                       {/* Iniciativa section */}
                       <div style={{ marginLeft: 12 }}>
@@ -662,12 +680,40 @@
                       </div>
                     </div>
 
-                    {/* Add effects input section */}
-                    <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input className="input-dark p-1 rounded text-sm" placeholder="Nome do efeito" value={(effectInputs[c.id] && effectInputs[c.id].name) || ''} onChange={e => setTempEffectField(c.id, 'name', e.target.value)} />
-                      <input className="input-dark p-1 rounded text-sm" placeholder="Dado (ex: 1d6 ou -1d6 ou +1d6, múltiplos separados por ,)" value={(effectInputs[c.id] && effectInputs[c.id].dice) || ''} onChange={e => setTempEffectField(c.id, 'dice', e.target.value)} />
-                      <input className="input-dark p-1 rounded text-sm" placeholder="Duração (0 indefinido)" value={(effectInputs[c.id] && effectInputs[c.id].duration) || ''} onChange={e => setTempEffectField(c.id, 'duration', e.target.value)} />
-                      <button className="btn-yellow" onClick={() => addEffectTo(i)}>Adicionar Efeito</button>
+                    {/* Add effects input section - accordion style */}
+                    <div style={{ marginTop: 8 }}>
+                      {!effectAccordions[c.id] ? (
+                        <button 
+                          className="btn-yellow" 
+                          onClick={() => toggleEffectAccordion(c.id)}
+                          style={{ padding: '6px 12px', fontSize: '0.875rem' }}
+                        >
+                          Adicionar Efeito/Condição
+                        </button>
+                      ) : (
+                        <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '12px', background: 'rgba(255,255,255,0.02)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                            <span className="text-sm font-semibold text-gray-300">Adicionar Efeito/Condição</span>
+                            <button 
+                              className="text-gray-400 hover:text-white" 
+                              onClick={() => toggleEffectAccordion(c.id)}
+                              style={{ fontSize: '1.2rem', background: 'none', border: 'none', cursor: 'pointer' }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input className="input-dark p-1 rounded text-sm" placeholder="Nome do efeito" value={(effectInputs[c.id] && effectInputs[c.id].name) || ''} onChange={e => setTempEffectField(c.id, 'name', e.target.value)} />
+                            <input className="input-dark p-1 rounded text-sm" placeholder="Dado (ex: 1d6 ou -1d6 ou +1d6, múltiplos separados por ,)" value={(effectInputs[c.id] && effectInputs[c.id].dice) || ''} onChange={e => setTempEffectField(c.id, 'dice', e.target.value)} />
+                            <input className="input-dark p-1 rounded text-sm" placeholder="Duração (0 indefinido)" value={(effectInputs[c.id] && effectInputs[c.id].duration) || ''} onChange={e => setTempEffectField(c.id, 'duration', e.target.value)} />
+                            <textarea className="input-dark p-1 rounded text-sm" placeholder="Descrição (opcional)" rows="2" style={{ minWidth: '200px', resize: 'vertical' }} value={(effectInputs[c.id] && effectInputs[c.id].description) || ''} onChange={e => setTempEffectField(c.id, 'description', e.target.value)} />
+                            <button className="btn-yellow" onClick={() => {
+                              addEffectTo(i);
+                              toggleEffectAccordion(c.id);
+                            }}>Adicionar</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -711,6 +757,41 @@
                 </div>
               </div>
             </div>
+            
+            {/* Stability Modal */}
+            {stabilityModal.open && stabilityModal.combatant && (
+              <div className="modal-bg">
+                <div className="modal-box">
+                  <div className="mb-3 text-lg text-yellow-200 font-semibold">
+                    Estado de Estabilidade - {stabilityModal.combatant.nome}
+                  </div>
+                  <div className="mb-4">
+                    {(() => {
+                      const estabTotal = safeNum(stabilityModal.combatant.estab) + Math.max(0, safeNum(stabilityModal.combatant.estabTemp || 0));
+                      const info = getEstabilidadeInfo(estabTotal);
+                      return (
+                        <div className="text-gray-300">
+                          <div className="mb-2">
+                            <strong className="text-white">Estado:</strong> {info.label} ({estabTotal})
+                          </div>
+                          <div>
+                            <strong className="text-white">Efeito:</strong> {info.desc}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="flex justify-center mt-4">
+                    <button 
+                      className="modal-btn cancel" 
+                      onClick={() => setStabilityModal({ open: false, combatant: null })}
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
       }
